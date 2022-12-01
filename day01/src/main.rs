@@ -1,34 +1,30 @@
 const INPUT: &str = include_str!("input.txt");
 
 fn main() {
-    println!("part1: {}", part1(INPUT));
-    println!("part2: {}", part2(INPUT));
+    let setup_time = std::time::Instant::now();
+    let (part1, part2) = solve(INPUT);
+    println!("solve time : {} µs", setup_time.elapsed().as_micros());
+    println!("part1: {}", part1);
+    println!("part2: {}", part2);
+    println!("total time: {} µs", setup_time.elapsed().as_micros());
 }
 
-fn part1(input: &str) -> i32 {
-    let mut result = 0;
+fn solve(input: &str) -> (i32, i32) {
+    let mut array = [0; 3];
     parse_input(input, |cals| {
-        if cals > result {
-            result = cals
-        }
+        ordered_insert(&mut array, cals);
     });
-    result
-}
-
-fn part2(input: &str) -> i32 {
-    let mut result = [0; 3];
-    parse_input(input, |cals| {
-        ordered_insert(&mut result, cals);
-    });
-    result.into_iter().sum()
+    (array[0], array.into_iter().sum())
 }
 
 fn ordered_insert<const C: usize>(slice: &mut [i32; C], value: i32) {
-    for i in 0..C {
-        if slice[i] < value {
-            slice.copy_within(i..(C - 1), i + 1);
-            slice[i] = value;
-            return;
+    if slice[C - 1] < value {
+        for i in 0..C {
+            if slice[i] < value {
+                slice.copy_within(i..(C - 1), i + 1);
+                slice[i] = value;
+                return;
+            }
         }
     }
 }
@@ -55,13 +51,13 @@ mod tests {
 
     #[test]
     fn test_part1() {
-        let result = part1(SAMPLE_INPUT);
+        let result = solve(SAMPLE_INPUT).0;
         assert_eq!(result, 24000);
     }
 
     #[test]
     fn test_part2() {
-        let result = part2(SAMPLE_INPUT);
+        let result = solve(SAMPLE_INPUT).1;
         assert_eq!(result, 45000);
     }
 }
