@@ -18,13 +18,11 @@ fn solve(input: &str) -> (i32, i32) {
 }
 
 fn ordered_insert<const C: usize>(slice: &mut [i32; C], value: i32) {
-    if slice[C - 1] < value {
-        for i in 0..C {
-            if slice[i] < value {
-                slice.copy_within(i..(C - 1), i + 1);
-                slice[i] = value;
-                return;
-            }
+    for i in 0..C {
+        if slice[i] < value {
+            slice.copy_within(i..(C - 1), i + 1);
+            slice[i] = value;
+            return;
         }
     }
 }
