@@ -6,26 +6,27 @@ fn main() {
 }
 
 fn part1(input: &str) -> i32 {
-    input.trim().lines().map(part1_score_line).sum()
-}
-
-fn part1_score_line(line: &str) -> i32 {
-    let mut chars = line.chars();
-    let other = Shape::from_char(chars.next().unwrap());
-    let me = Shape::from_char(chars.skip(1).next().unwrap());
-    Round::new(me, other).to_points()
+    solve(input, score_line::<Shape, Shape, Round>)
 }
 
 fn part2(input: &str) -> i32 {
-    input.trim().lines().map(part2_score_line).sum()
+    solve(input, score_line::<Shape, Outcome, Round>)
 }
 
-fn part2_score_line(line: &str) -> i32 {
+fn solve(input: &str, f: impl Fn(&str) -> i32) -> i32 {
+    input.trim().lines().map(f).sum()
+}
+
+fn score_line<A, B, C>(line: &str) -> i32
+where
+    A: From<char>,
+    B: From<char>,
+    C: From<(A, B)> + Score,
+{
     let mut chars = line.chars();
-    let other = Shape::from_char(chars.next().unwrap());
-    let outcome = Outcome::from_char(chars.skip(1).next().unwrap());
-    let me = other.play_for_outcome(outcome);
-    Round::new(me, other).to_points()
+    let a = chars.next().unwrap().into();
+    let b = chars.skip(1).next().unwrap().into();
+    C::from((a, b)).score()
 }
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
@@ -70,16 +71,47 @@ impl Shape {
             Draw => self,
         }
     }
+}
 
-    fn from_char(c: char) -> Self {
+impl From<char> for Shape {
+    fn from(value: char) -> Self {
         use Shape::*;
-        match c {
+        match value {
             'A' | 'X' => Rock,
             'B' | 'Y' => Paper,
             'C' | 'Z' => Scissors,
             _ => unreachable!(),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Outcome {
+    Win = 6,
+    Draw = 3,
+    Loss = 0,
+}
+
+impl Outcome {
+    fn to_points(self) -> i32 {
+        self as i32
+    }
+}
+
+impl From<char> for Outcome {
+    fn from(value: char) -> Self {
+        use Outcome::*;
+        match value {
+            'X' => Loss,
+            'Y' => Draw,
+            'Z' => Win,
+            _ => unreachable!(),
+        }
+    }
+}
+
+trait Score {
+    fn score(&self) -> i32;
 }
 
 struct Round {
@@ -101,32 +133,24 @@ impl Round {
             Outcome::Draw
         }
     }
+}
 
-    fn to_points(&self) -> i32 {
+impl Score for Round {
+    fn score(&self) -> i32 {
         self.me.to_points() + self.outcome().to_points()
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-enum Outcome {
-    Win = 6,
-    Draw = 3,
-    Loss = 0,
+impl From<(Shape, Shape)> for Round {
+    fn from((other, me): (Shape, Shape)) -> Self {
+        Self::new(me, other)
+    }
 }
 
-impl Outcome {
-    fn from_char(c: char) -> Self {
-        use Outcome::*;
-        match c {
-            'X' => Loss,
-            'Y' => Draw,
-            'Z' => Win,
-            _ => unreachable!(),
-        }
-    }
-
-    fn to_points(self) -> i32 {
-        self as i32
+impl From<(Shape, Outcome)> for Round {
+    fn from((other, outcome): (Shape, Outcome)) -> Self {
+        let me = other.play_for_outcome(outcome);
+        Self::new(me, other)
     }
 }
 
