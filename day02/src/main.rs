@@ -1,8 +1,31 @@
 const INPUT: &str = include_str!("input.txt");
 
 fn main() {
-    println!("Part1: {}", score(INPUT));
+    println!("Part1: {}", part1(INPUT));
     println!("Part2: {}", part2(INPUT));
+}
+
+fn part1(input: &str) -> i32 {
+    input.trim().lines().map(part1_score_line).sum()
+}
+
+fn part1_score_line(line: &str) -> i32 {
+    let mut chars = line.chars();
+    let other = Shape::from_char(chars.next().unwrap());
+    let me = Shape::from_char(chars.skip(1).next().unwrap());
+    Round::new(me, other).to_points()
+}
+
+fn part2(input: &str) -> i32 {
+    input.trim().lines().map(part2_score_line).sum()
+}
+
+fn part2_score_line(line: &str) -> i32 {
+    let mut chars = line.chars();
+    let other = Shape::from_char(chars.next().unwrap());
+    let outcome = Outcome::from_char(chars.skip(1).next().unwrap());
+    let me = other.play_for_outcome(outcome);
+    Round::new(me, other).to_points()
 }
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
@@ -13,51 +36,74 @@ enum Shape {
 }
 
 impl Shape {
-    fn to_points(&self) -> i32 {
-        *self as i32
+    fn to_points(self) -> i32 {
+        self as i32
     }
 
-    fn round_outcome(&self, other: &Self) -> Outcome {
-        use Outcome::*;
+    fn wins_against(self, other: Self) -> bool {
+        other.to_winner() == self
+    }
+
+    fn to_winner(self) -> Self {
         use Shape::*;
-        match (self, other) {
-            (Rock, Paper) => Loss,
-            (Paper, Scissors) => Loss,
-            (Scissors, Rock) => Loss,
-            (a, b) if a == b => Draw,
-            (_, _) => Win,
+        match self {
+            Rock => Paper,
+            Paper => Scissors,
+            Scissors => Rock,
         }
     }
 
-    fn round_result(&self, other: &Self) -> i32 {
-        self.to_points() + self.round_outcome(other).to_points()
+    fn to_loser(self) -> Self {
+        use Shape::*;
+        match self {
+            Rock => Scissors,
+            Paper => Rock,
+            Scissors => Paper,
+        }
+    }
+
+    fn play_for_outcome(self, outcome: Outcome) -> Self {
+        use Outcome::*;
+        match outcome {
+            Win => self.to_winner(),
+            Loss => self.to_loser(),
+            Draw => self,
+        }
     }
 
     fn from_char(c: char) -> Self {
         use Shape::*;
         match c {
-            'A' => Rock,
-            'B' => Paper,
-            'C' => Scissors,
-            'X' => Rock,
-            'Y' => Paper,
-            'Z' => Scissors,
+            'A' | 'X' => Rock,
+            'B' | 'Y' => Paper,
+            'C' | 'Z' => Scissors,
             _ => unreachable!(),
         }
     }
+}
 
-    fn play_for_outcome(&self, outcome: &Outcome) -> Self {
-        use Outcome::*;
-        use Shape::*;
-        match (self, outcome) {
-            (s, Draw) => *s,
-            (Rock, Win) => Paper,
-            (Paper, Win) => Scissors,
-            (Scissors, Win) => Rock,
-            (Rock, Loss) => Scissors,
-            (Paper, Loss) => Rock,
-            (Scissors, Loss) => Paper,
+struct Round {
+    me: Shape,
+    other: Shape,
+}
+
+impl Round {
+    fn new(me: Shape, other: Shape) -> Self {
+        Self { me, other }
+    }
+
+    fn outcome(&self) -> Outcome {
+        if self.me.wins_against(self.other) {
+            Outcome::Win
+        } else if self.other.wins_against(self.me) {
+            Outcome::Loss
+        } else {
+            Outcome::Draw
         }
+    }
+
+    fn to_points(&self) -> i32 {
+        self.me.to_points() + self.outcome().to_points()
     }
 }
 
@@ -79,35 +125,9 @@ impl Outcome {
         }
     }
 
-    fn to_points(&self) -> i32 {
-        *self as i32
+    fn to_points(self) -> i32 {
+        self as i32
     }
-}
-
-fn score_line(line: &str) -> i32 {
-    let mut chars = line.chars();
-    let other = Shape::from_char(chars.next().unwrap());
-    chars.next();
-    let me = Shape::from_char(chars.next().unwrap());
-    me.round_result(&other)
-}
-
-fn score(input: &str) -> i32 {
-    input.trim().lines().map(score_line).sum()
-}
-
-fn part2_score_line(line: &str) -> i32 {
-    let mut chars = line.chars();
-    let other = Shape::from_char(chars.next().unwrap());
-    chars.next();
-    let outcome = Outcome::from_char(chars.next().unwrap());
-    let me = other.play_for_outcome(&outcome);
-    let result = me.round_result(&other);
-    result
-}
-
-fn part2(input: &str) -> i32 {
-    input.trim().lines().map(part2_score_line).sum()
 }
 
 #[cfg(test)]
@@ -118,7 +138,7 @@ mod tests {
 
     #[test]
     fn test_sample_input() {
-        assert_eq!(score(SAMPLE_INPUT), 15);
+        assert_eq!(part1(SAMPLE_INPUT), 15);
     }
 
     #[test]
