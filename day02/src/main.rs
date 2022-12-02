@@ -1,23 +1,29 @@
 const INPUT: &str = include_str!("input.txt");
 
 fn main() {
-    println!("Part1: {}", part1(INPUT));
-    println!("Part2: {}", part2(INPUT));
+    let setup_time = std::time::Instant::now();
+    let part1 = part1(INPUT);
+    let part1_dur = setup_time.elapsed().as_micros();
+    let setup_time = std::time::Instant::now();
+    let part2 = part2(INPUT);
+    let part2_dur = setup_time.elapsed().as_micros();
+    println!("Part1: {part1} in {part1_dur} µs");
+    println!("Part2: {part2} in {part2_dur} µs");
 }
 
 fn part1(input: &str) -> i32 {
-    solve(input, score_line::<Shape, Shape, Round>)
+    solve(input, line_score::<Shape, Shape, Round>)
 }
 
 fn part2(input: &str) -> i32 {
-    solve(input, score_line::<Shape, Outcome, Round>)
+    solve(input, line_score::<Shape, Outcome, Round>)
 }
 
 fn solve(input: &str, f: impl Fn(&str) -> i32) -> i32 {
     input.trim().lines().map(f).sum()
 }
 
-fn score_line<A, B, C>(line: &str) -> i32
+fn line_score<A, B, C>(line: &str) -> i32
 where
     A: From<char>,
     B: From<char>,
@@ -29,6 +35,10 @@ where
     C::from((a, b)).score()
 }
 
+trait Score {
+    fn score(&self) -> i32;
+}
+
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 enum Shape {
     Rock = 1,
@@ -37,10 +47,6 @@ enum Shape {
 }
 
 impl Shape {
-    fn to_points(self) -> i32 {
-        self as i32
-    }
-
     fn wins_against(self, other: Self) -> bool {
         other.to_winner() == self
     }
@@ -85,17 +91,17 @@ impl From<char> for Shape {
     }
 }
 
+impl Score for Shape {
+    fn score(&self) -> i32 {
+        *self as i32
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum Outcome {
     Win = 6,
     Draw = 3,
     Loss = 0,
-}
-
-impl Outcome {
-    fn to_points(self) -> i32 {
-        self as i32
-    }
 }
 
 impl From<char> for Outcome {
@@ -110,8 +116,10 @@ impl From<char> for Outcome {
     }
 }
 
-trait Score {
-    fn score(&self) -> i32;
+impl Score for Outcome {
+    fn score(&self) -> i32 {
+        *self as i32
+    }
 }
 
 struct Round {
@@ -137,7 +145,7 @@ impl Round {
 
 impl Score for Round {
     fn score(&self) -> i32 {
-        self.me.to_points() + self.outcome().to_points()
+        self.me.score() + self.outcome().score()
     }
 }
 
