@@ -19,8 +19,7 @@ fn part1(input: &str) -> i32 {
 fn comp_common_sum(line: &str) -> i32 {
     let (comp1, comp2) = split_compartments(line.as_bytes());
     common_items(comp1, comp2)
-        .iter()
-        .copied()
+        .into_iter()
         .map(char_to_priority)
         .sum()
 }
