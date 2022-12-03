@@ -13,10 +13,10 @@ fn main() {
 }
 
 fn part1(input: &str) -> i32 {
-    input.trim().lines().map(part1_rucksack).sum()
+    input.trim().lines().map(comp_common_sum).sum()
 }
 
-fn part1_rucksack(line: &str) -> i32 {
+fn comp_common_sum(line: &str) -> i32 {
     let (comp1, comp2) = split_compartments(line.as_bytes());
     common_items(comp1, comp2)
         .iter()
@@ -34,11 +34,11 @@ fn part2(input: &str) -> i32 {
     })
 }
 
-fn common_items(comp1: &[u8], comp2: &[u8]) -> Vec<u8> {
-    let mut result = Vec::with_capacity(comp1.len());
-    comp1
+fn common_items(slice1: &[u8], slice2: &[u8]) -> Vec<u8> {
+    let mut result = Vec::with_capacity(slice1.len());
+    slice1
         .iter()
-        .filter_map(|&char| comp2.iter().find(|&c| *c == char))
+        .filter_map(|&char| slice2.iter().find(|&c| *c == char))
         .for_each(|c| distinct_push(&mut result, *c));
     result
 }
