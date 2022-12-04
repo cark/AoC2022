@@ -15,21 +15,17 @@ fn main() {
 }
 
 fn part1(input: &str) -> usize {
-    input
-        .trim()
-        .lines()
-        .map(|line| {
-            let mut ranges = line.split(',');
-            (
-                make_range(ranges.next().unwrap()),
-                make_range(ranges.next().unwrap()),
-            )
-        })
-        .filter(|(r1, r2)| contains(r1, r2))
-        .count()
+    solve(input, contains)
 }
 
 fn part2(input: &str) -> usize {
+    solve(input, overlaps)
+}
+
+fn solve(
+    input: &str,
+    filter: impl Fn(&RangeInclusive<usize>, &RangeInclusive<usize>) -> bool,
+) -> usize {
     input
         .trim()
         .lines()
@@ -40,8 +36,14 @@ fn part2(input: &str) -> usize {
                 make_range(ranges.next().unwrap()),
             )
         })
-        .filter(|(r1, r2)| overlaps(r1, r2))
+        .filter(|(r1, r2)| filter(r1, r2))
         .count()
+}
+
+fn make_range(txt: &str) -> RangeInclusive<usize> {
+    let mut bounds = txt.split('-');
+    bounds.next().unwrap().parse::<usize>().unwrap()
+        ..=(bounds.next().unwrap().parse::<usize>().unwrap())
 }
 
 fn contains(r1: &RangeInclusive<usize>, r2: &RangeInclusive<usize>) -> bool {
@@ -52,12 +54,6 @@ fn contains(r1: &RangeInclusive<usize>, r2: &RangeInclusive<usize>) -> bool {
 fn overlaps(r1: &RangeInclusive<usize>, r2: &RangeInclusive<usize>) -> bool {
     (r1.start() <= r2.start() && r1.end() >= r2.start())
         || (r2.start() <= r1.start() && r2.end() >= r1.start())
-}
-
-fn make_range(txt: &str) -> RangeInclusive<usize> {
-    let mut bounds = txt.split('-');
-    bounds.next().unwrap().parse::<usize>().unwrap()
-        ..=(bounds.next().unwrap().parse::<usize>().unwrap())
 }
 
 #[cfg(test)]
@@ -74,6 +70,6 @@ mod tests {
     #[test]
     fn test_part2() {
         assert_eq!(part2(TEST_INPUT), 4);
-        //        assert_eq!(part2(INPUT), 441);
+        assert_eq!(part2(INPUT), 861);
     }
 }
