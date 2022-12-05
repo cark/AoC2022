@@ -1,5 +1,3 @@
-use std::cell::UnsafeCell;
-
 const INPUT: &str = include_str!("input.txt");
 
 fn main() {
@@ -118,15 +116,23 @@ fn crane_9001_move(m: &Move, stacks: &mut Stacks) {
 
     // I had to go unsafe in order to avoid allocating a temp vector there
     // Safety : what's that ?
-    let stacks_cell = UnsafeCell::new(stacks);
-    let (from_stacks, to_stacks): (&UnsafeCell<&mut Stacks>, &UnsafeCell<&mut Stacks>) =
-        (&stacks_cell, &stacks_cell);
-    unsafe {
-        let f = &mut (*from_stacks.get())[from];
-        let t = &mut (*to_stacks.get())[to];
-        t.extend_from_slice(&f[copy_from..]);
-        f.truncate(copy_from);
-    };
+    // let stacks_cell = UnsafeCell::new(stacks);
+    // let (from_stacks, to_stacks): (&UnsafeCell<&mut Stacks>, &UnsafeCell<&mut Stacks>) =
+    //     (&stacks_cell, &stacks_cell);
+    // unsafe {
+    //     let f = &mut (*from_stacks.get())[from];
+    //     let t = &mut (*to_stacks.get())[to];
+    //     t.extend_from_slice(&f[copy_from..]);
+    //     f.truncate(copy_from);
+    // };
+
+    // third way: use take
+    let mut from_stack = std::mem::take(&mut stacks[from]);
+    let mut to_stack = std::mem::take(&mut stacks[to]);
+    to_stack.extend_from_slice(&from_stack[copy_from..]);
+    from_stack.truncate(copy_from);
+    stacks[from] = from_stack;
+    stacks[to] = to_stack;
 }
 
 fn exec_moves<F: Fn(&Move, &mut Stacks)>(input: &mut Input, f: F) {
