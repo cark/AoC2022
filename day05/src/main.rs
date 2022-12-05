@@ -109,7 +109,7 @@ fn crane_9001_move(m: &Move, stacks: &mut Stacks) {
         (&stacks_cell, &stacks_cell);
     unsafe {
         let f = &mut (*from_stacks.get())[from];
-        let t = &mut (*to_stacks.get()).get_mut(to).unwrap();
+        let t = &mut (*to_stacks.get())[to];
         t.extend_from_slice(&f[copy_from..]);
         f.truncate(copy_from);
     };
