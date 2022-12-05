@@ -14,10 +14,24 @@ fn main() {
     println!("Part2 : {} in {} ns", part2, part2_dur);
 }
 
+fn part1(input: &str) -> String {
+    solve(input, crane_9000_move)
+}
+
+fn part2(input: &str) -> String {
+    solve(input, crane_9001_move)
+}
+
+fn solve<F: Fn(&Move, &mut Stacks)>(input: &str, crane_move: F) -> String {
+    let mut input = parse(input);
+    exec_moves(&mut input, crane_move);
+    collect_top_crates(&input)
+}
+
 type Stack = Vec<u8>;
 type Stacks = Vec<Stack>;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 struct Move {
     qty: u8,
     from: u8,
@@ -134,20 +148,6 @@ fn collect_top_crates(input: &Input) -> String {
                 .collect::<Vec<u8>>(),
         )
     }
-}
-
-fn solve<F: Fn(&Move, &mut Stacks)>(input: &str, crane_move: F) -> String {
-    let mut input = parse(input);
-    exec_moves(&mut input, crane_move);
-    collect_top_crates(&input)
-}
-
-fn part1(input: &str) -> String {
-    solve(input, crane_9000_move)
-}
-
-fn part2(input: &str) -> String {
-    solve(input, crane_9001_move)
 }
 
 #[cfg(test)]
