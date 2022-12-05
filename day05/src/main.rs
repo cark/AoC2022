@@ -13,32 +13,82 @@ fn main() {
 }
 
 fn part1(input: &str) -> String {
-    solve(input, crane_9000_move)
+    solve::<Model9000>(input)
 }
 
 fn part2(input: &str) -> String {
-    solve(input, crane_9001_move)
+    solve::<Model9001>(input)
 }
 
-fn solve<F: Fn(&Move, &mut Stacks)>(input: &str, crane_move: F) -> String {
+fn solve<C: Crane>(input: &str) -> String {
     let mut input = parse(input);
-    exec_moves(&mut input, crane_move);
+    exec_moves::<C>(&mut input);
     collect_top_crates(&input)
 }
 
-type Stack = Vec<u8>;
-type Stacks = Vec<Stack>;
-
-#[derive(Debug, PartialEq)]
-struct Move {
-    qty: u8,
-    from: u8,
-    to: u8,
+fn exec_moves<C: Crane>(input: &mut Input) {
+    for m in input.moves.iter() {
+        let stacks = &mut input.stacks;
+        let mut from_stack = std::mem::take(&mut stacks[m.from - 1]);
+        let mut to_stack = std::mem::take(&mut stacks[m.to - 1]);
+        C::apply_move(m.qty, &mut from_stack, &mut to_stack);
+        stacks[m.from - 1] = from_stack;
+        stacks[m.to - 1] = to_stack;
+    }
 }
 
 struct Input {
     stacks: Stacks,
     moves: Vec<Move>,
+}
+
+type Stacks = Vec<Stack>;
+type Stack = Vec<u8>;
+
+#[derive(Debug, PartialEq)]
+struct Move {
+    from: usize,
+    to: usize,
+    qty: u8,
+}
+
+trait Crane {
+    fn apply_move(crate_count: u8, from_stack: &mut Stack, to_stack: &mut Stack);
+}
+
+struct Model9000;
+
+impl Crane for Model9000 {
+    fn apply_move(crate_count: u8, from_stack: &mut Stack, to_stack: &mut Stack) {
+        for _ in 0..crate_count {
+            to_stack.push(from_stack.pop().unwrap())
+        }
+    }
+}
+
+struct Model9001;
+
+impl Crane for Model9001 {
+    fn apply_move(crate_count: u8, from_stack: &mut Stack, to_stack: &mut Stack) {
+        let from_index = from_stack.len() - crate_count as usize;
+        to_stack.extend_from_slice(&from_stack[from_index..]);
+        from_stack.truncate(from_index);
+    }
+}
+
+fn collect_top_crates(input: &Input) -> String {
+    // Safety: I built the damn thing myself ! (everything an ascii char)
+    // I'd still unwrap it anyways
+    unsafe {
+        String::from_utf8_unchecked(
+            input
+                .stacks
+                .iter()
+                .map(|stack| stack.last().unwrap())
+                .copied()
+                .collect::<Vec<u8>>(),
+        )
+    }
 }
 
 fn parse(input: &str) -> Input {
@@ -47,7 +97,6 @@ fn parse(input: &str) -> Input {
     Input { stacks, moves }
 }
 
-//1 5 8
 fn parse_stacks(mut input: &str) -> (Stacks, &str) {
     let mut stacks: Vec<Vec<u8>> = vec![];
     loop {
@@ -88,72 +137,11 @@ fn parse_moves(input: &str) -> Vec<Move> {
             let mut tokens = line.split_whitespace();
             Move {
                 qty: tokens.nth(1).unwrap().parse::<u8>().unwrap(),
-                from: tokens.nth(1).unwrap().parse::<u8>().unwrap(),
-                to: tokens.nth(1).unwrap().parse::<u8>().unwrap(),
+                from: tokens.nth(1).unwrap().parse::<usize>().unwrap(),
+                to: tokens.nth(1).unwrap().parse::<usize>().unwrap(),
             }
         })
         .collect::<Vec<Move>>()
-}
-
-fn crane_9000_move(m: &Move, stacks: &mut Stacks) {
-    let from = m.from as usize - 1;
-    let to = m.to as usize - 1;
-    for _ in 0..m.qty {
-        let item = stacks[from].pop().unwrap();
-        stacks[to].push(item);
-    }
-}
-
-fn crane_9001_move(m: &Move, stacks: &mut Stacks) {
-    let from = m.from as usize - 1;
-    let to = m.to as usize - 1;
-    let copy_from = stacks[from].len() - m.qty as usize;
-
-    // the old safe way
-    // let mut items = Vec::from(&stacks[from][copy_from..]);
-    // stacks[to].append(&mut items);
-    // stacks[from].truncate(copy_from)
-
-    // I had to go unsafe in order to avoid allocating a temp vector there
-    // Safety : what's that ?
-    // let stacks_cell = UnsafeCell::new(stacks);
-    // let (from_stacks, to_stacks): (&UnsafeCell<&mut Stacks>, &UnsafeCell<&mut Stacks>) =
-    //     (&stacks_cell, &stacks_cell);
-    // unsafe {
-    //     let f = &mut (*from_stacks.get())[from];
-    //     let t = &mut (*to_stacks.get())[to];
-    //     t.extend_from_slice(&f[copy_from..]);
-    //     f.truncate(copy_from);
-    // };
-
-    // third way: use take
-    let mut from_stack = std::mem::take(&mut stacks[from]);
-    let mut to_stack = std::mem::take(&mut stacks[to]);
-    to_stack.extend_from_slice(&from_stack[copy_from..]);
-    from_stack.truncate(copy_from);
-    stacks[from] = from_stack;
-    stacks[to] = to_stack;
-}
-
-fn exec_moves<F: Fn(&Move, &mut Stacks)>(input: &mut Input, f: F) {
-    for m in input.moves.iter() {
-        f(m, &mut input.stacks);
-    }
-}
-
-fn collect_top_crates(input: &Input) -> String {
-    // Safety: I built the damn thing myself ! (everything an ascii char)
-    // I'd still unwrap it anyways
-    unsafe {
-        String::from_utf8_unchecked(
-            input
-                .stacks
-                .iter()
-                .map(|stack| stack.last().unwrap())
-                .copied()
-                .collect::<Vec<u8>>(),
-        )
-    }
 }
 
 #[cfg(test)]
