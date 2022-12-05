@@ -1,3 +1,5 @@
+use std::cell::UnsafeCell;
+
 const INPUT: &str = include_str!("input.txt");
 
 fn main() {
@@ -94,9 +96,18 @@ fn crane_9001_move(m: &Move, stacks: &mut Stacks) {
     let from = m.from as usize - 1;
     let to = m.to as usize - 1;
     let copy_from = stacks[from].len() - m.qty as usize;
-    let mut items = Vec::from(&stacks[from][copy_from..]);
-    stacks[to].append(&mut items);
-    stacks[from].truncate(copy_from);
+
+    // I had to go unsafe in order to avoid allocating a temp vector there
+    // Safety : what's that ?
+    let stacks_cell = UnsafeCell::new(stacks);
+    let (from_stacks, to_stacks): (&UnsafeCell<&mut Stacks>, &UnsafeCell<&mut Stacks>) =
+        (&stacks_cell, &stacks_cell);
+    unsafe {
+        let f = &mut (*from_stacks.get())[from];
+        let t = &mut (*to_stacks.get()).get_mut(to).unwrap();
+        f[copy_from..].iter().for_each(|&v| t.push(v));
+        f.truncate(copy_from);
+    };
 }
 
 fn exec_moves<F: Fn(&Move, &mut Stacks)>(input: &mut Input, f: F) {
