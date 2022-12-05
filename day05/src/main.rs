@@ -97,6 +97,11 @@ fn crane_9001_move(m: &Move, stacks: &mut Stacks) {
     let to = m.to as usize - 1;
     let copy_from = stacks[from].len() - m.qty as usize;
 
+    // the old safe way
+    // let mut items = Vec::from(&stacks[from][copy_from..]);
+    // stacks[to].append(&mut items);
+    // stacks[from].truncate(copy_from)
+
     // I had to go unsafe in order to avoid allocating a temp vector there
     // Safety : what's that ?
     let stacks_cell = UnsafeCell::new(stacks);
