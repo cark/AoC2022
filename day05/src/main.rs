@@ -142,7 +142,7 @@ fn exec_moves<F: Fn(&Move, &mut Stacks)>(input: &mut Input, f: F) {
 }
 
 fn collect_top_crates(input: &Input) -> String {
-    // Safety: I built the damn thing myself ! (everything an ascii letter)
+    // Safety: I built the damn thing myself ! (everything an ascii char)
     // I'd still unwrap it anyways
     unsafe {
         String::from_utf8_unchecked(
