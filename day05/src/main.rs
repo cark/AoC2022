@@ -49,7 +49,7 @@ fn parse_stacks(mut input: &str) -> (Stacks, &str) {
             if char >= b'1' && char <= b'9' {
                 continue;
             } else {
-                for i in 0..9 {
+                for i in 0.. {
                     if let Some(&name) = line.as_bytes().get(i * 4 + 1) {
                         if name >= b'A' && name <= b'Z' {
                             if stacks.len() <= i {
@@ -57,6 +57,8 @@ fn parse_stacks(mut input: &str) -> (Stacks, &str) {
                             }
                             stacks[i].push(name);
                         }
+                    } else {
+                        break;
                     }
                 }
             }
@@ -79,7 +81,7 @@ fn parse_moves(input: &str) -> Vec<Move> {
         .collect::<Vec<Move>>()
 }
 
-fn exec_move_9000(m: &Move, stacks: &mut Stacks) {
+fn crane_9000_move(m: &Move, stacks: &mut Stacks) {
     let from = m.from as usize - 1;
     let to = m.to as usize - 1;
     for _ in 0..m.qty {
@@ -88,7 +90,7 @@ fn exec_move_9000(m: &Move, stacks: &mut Stacks) {
     }
 }
 
-fn exec_move_9001(m: &Move, stacks: &mut Stacks) {
+fn crane_9001_move(m: &Move, stacks: &mut Stacks) {
     let from = m.from as usize - 1;
     let to = m.to as usize - 1;
     let copy_from = stacks[from].len() - m.qty as usize;
@@ -118,16 +120,18 @@ fn collect_top_crates(input: &Input) -> String {
     }
 }
 
-fn part1(input: &str) -> String {
+fn solve<F: Fn(&Move, &mut Stacks)>(input: &str, crane_move: F) -> String {
     let mut input = parse(input);
-    exec_moves(&mut input, exec_move_9000);
+    exec_moves(&mut input, crane_move);
     collect_top_crates(&input)
 }
 
+fn part1(input: &str) -> String {
+    solve(input, crane_9000_move)
+}
+
 fn part2(input: &str) -> String {
-    let mut input = parse(input);
-    exec_moves(&mut input, exec_move_9001);
-    collect_top_crates(&input)
+    solve(input, crane_9001_move)
 }
 
 #[cfg(test)]
