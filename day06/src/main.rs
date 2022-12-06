@@ -4,10 +4,10 @@ const INPUT: &str = include_str!("input.txt");
 
 fn main() {
     let (part1, duration) = with_timing(|| part1(INPUT));
-    println!("Part1 : {} in {} µs", part1, duration);
+    println!("Part1: {} in {} µs", part1, duration);
 
     let (part2, duration) = with_timing(|| part2(INPUT));
-    println!("Part2 : {} in {} µs", part2, duration);
+    println!("Part2: {} in {} µs", part2, duration);
 }
 
 fn with_timing<Result: Display>(f: impl Fn() -> Result) -> (Result, u128) {
