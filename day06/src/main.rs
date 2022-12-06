@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 const INPUT: &str = include_str!("input.txt");
 
 fn main() {
@@ -10,7 +8,7 @@ fn main() {
     println!("Part2: {} in {} µs", part2, duration);
 }
 
-fn with_timing<Result: Display>(f: impl Fn() -> Result) -> (Result, u128) {
+fn with_timing<Result: std::fmt::Display>(f: impl Fn() -> Result) -> (Result, u128) {
     let start_time = std::time::Instant::now();
     let result = f();
     let duration = start_time.elapsed().as_micros();
