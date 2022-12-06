@@ -13,23 +13,21 @@ fn main() {
 }
 
 fn part1(input: &str) -> usize {
-    let (window_index, _) = input
-        .as_bytes()
-        .windows(4)
-        .enumerate()
-        .find(|(_, window)| is_start_marker(window))
-        .unwrap();
-    window_index + 4
+    solve::<4>(input)
 }
 
 fn part2(input: &str) -> usize {
+    solve::<14>(input)
+}
+
+fn solve<const WINDOW_SIZE: usize>(input: &str) -> usize {
     let (window_index, _) = input
         .as_bytes()
-        .windows(14)
+        .windows(WINDOW_SIZE)
         .enumerate()
         .find(|(_, window)| is_start_marker(window))
         .unwrap();
-    window_index + 14
+    window_index + WINDOW_SIZE
 }
 
 fn is_start_marker(window: &[u8]) -> bool {
@@ -41,9 +39,6 @@ fn is_start_marker(window: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // const TEST_INPUT: &str = include_str!("test_input.txt");
-    // const TEST_INPUT2: &str = include_str!("test_input2.txt");
 
     #[test]
     fn test_is_start_marker() {
