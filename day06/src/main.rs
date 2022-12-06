@@ -1,20 +1,22 @@
 const INPUT: &str = include_str!("input.txt");
+const PACKET_MARKER_SIZE: usize = 4;
+const MESSAGE_MARKER_SIZE: usize = 14;
 
 fn main() {
     println!("First method:");
-    let (part1, duration) = with_timing(|| solve::<4>(INPUT));
+    let (part1, duration) = with_timing(|| solve::<PACKET_MARKER_SIZE>(INPUT));
     println!("Part1: {} in {} µs", part1, duration);
-    let (part2, duration) = with_timing(|| solve::<14>(INPUT));
+    let (part2, duration) = with_timing(|| solve::<MESSAGE_MARKER_SIZE>(INPUT));
     println!("Part2: {} in {} µs", part2, duration);
 
     println!("\nSecond method:");
-    let (part1, duration) = with_timing(|| solve_faster::<4>(INPUT));
+    let (part1, duration) = with_timing(|| solve_faster::<PACKET_MARKER_SIZE>(INPUT));
     println!("Part1: {} in {} µs", part1, duration);
-    let (part2, duration) = with_timing(|| solve_faster::<14>(INPUT));
+    let (part2, duration) = with_timing(|| solve_faster::<MESSAGE_MARKER_SIZE>(INPUT));
     println!("Part2: {} in {} µs", part2, duration);
 }
 
-fn with_timing<Result: std::fmt::Display>(f: impl Fn() -> Result) -> (Result, u128) {
+fn with_timing<Solution: std::fmt::Display>(f: impl Fn() -> Solution) -> (Solution, u128) {
     let start_time = std::time::Instant::now();
     let result = f();
     let duration = start_time.elapsed().as_micros();
@@ -47,42 +49,42 @@ fn solve_faster<const WINDOW_SIZE: usize>(input: &str) -> usize {
     slider.index
 }
 
-struct Slider<const C: usize> {
-    circular_window: [u8; C],
-    byte_counts: [u8; 256],
+struct Slider<const WINDOW_SIZE: usize> {
     duplicate_count: usize,
     index: usize,
+    occurences: [u8; 256],
+    circular_window: [u8; WINDOW_SIZE],
 }
 
-impl<const C: usize> Slider<C> {
+impl<const WINDOW_SIZE: usize> Slider<WINDOW_SIZE> {
     fn new() -> Self {
         Self {
-            circular_window: [0; C],
-            byte_counts: [0; 256],
+            circular_window: [0; WINDOW_SIZE],
+            occurences: [0; 256],
             duplicate_count: 0,
             index: 0,
         }
     }
 
     fn add_byte(&mut self, byte: u8) -> bool {
+        let window_byte = &mut self.circular_window[self.index % WINDOW_SIZE];
         // remove
-        let last_item = &mut self.circular_window[self.index % C];
-        if self.index >= C {
-            let byte_occurences = &mut self.byte_counts[*last_item as usize];
+        if self.index >= WINDOW_SIZE {
+            let byte_occurences = &mut self.occurences[*window_byte as usize];
             if *byte_occurences > 1 {
                 self.duplicate_count -= 1;
             }
             *byte_occurences -= 1;
         }
         // add
-        *last_item = byte;
-        let byte_occurences = &mut self.byte_counts[byte as usize];
+        *window_byte = byte;
+        let byte_occurences = &mut self.occurences[byte as usize];
         *byte_occurences += 1;
         if *byte_occurences > 1 {
             self.duplicate_count += 1;
         }
         self.index += 1;
-        self.duplicate_count == 0 && self.index > C
+        self.duplicate_count == 0 && self.index > WINDOW_SIZE
     }
 }
 
