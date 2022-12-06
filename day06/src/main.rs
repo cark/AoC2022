@@ -1,15 +1,20 @@
+use std::fmt::Display;
+
 const INPUT: &str = include_str!("input.txt");
 
 fn main() {
-    let setup_time = std::time::Instant::now();
-    let part1 = part1(INPUT);
-    let part1_dur = setup_time.elapsed().as_micros();
-    println!("Part1 : {} in {} µs", part1, part1_dur);
+    let (part1, duration) = with_timing(|| part1(INPUT));
+    println!("Part1 : {} in {} µs", part1, duration);
 
-    let setup_time = std::time::Instant::now();
-    let part2 = part2(INPUT);
-    let part2_dur = setup_time.elapsed().as_micros();
-    println!("Part2 : {} in {} µs", part2, part2_dur);
+    let (part2, duration) = with_timing(|| part2(INPUT));
+    println!("Part2 : {} in {} µs", part2, duration);
+}
+
+fn with_timing<Result: Display>(f: impl Fn() -> Result) -> (Result, u128) {
+    let start_time = std::time::Instant::now();
+    let result = f();
+    let duration = start_time.elapsed().as_micros();
+    (result, duration)
 }
 
 fn part1(input: &str) -> usize {
