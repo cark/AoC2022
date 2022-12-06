@@ -1,10 +1,16 @@
 const INPUT: &str = include_str!("input.txt");
 
 fn main() {
-    let (part1, duration) = with_timing(|| part1(INPUT));
+    println!("First method:");
+    let (part1, duration) = with_timing(|| solve::<4>(INPUT));
     println!("Part1: {} in {} µs", part1, duration);
+    let (part2, duration) = with_timing(|| solve::<14>(INPUT));
+    println!("Part2: {} in {} µs", part2, duration);
 
-    let (part2, duration) = with_timing(|| part2(INPUT));
+    println!("\nSecond method:");
+    let (part1, duration) = with_timing(|| solve_faster::<4>(INPUT));
+    println!("Part1: {} in {} µs", part1, duration);
+    let (part2, duration) = with_timing(|| solve_faster::<14>(INPUT));
     println!("Part2: {} in {} µs", part2, duration);
 }
 
@@ -13,14 +19,6 @@ fn with_timing<Result: std::fmt::Display>(f: impl Fn() -> Result) -> (Result, u1
     let result = f();
     let duration = start_time.elapsed().as_micros();
     (result, duration)
-}
-
-fn part1(input: &str) -> usize {
-    solve::<4>(input)
-}
-
-fn part2(input: &str) -> usize {
-    solve::<14>(input)
 }
 
 fn solve<const WINDOW_SIZE: usize>(input: &str) -> usize {
@@ -39,6 +37,55 @@ fn is_start_marker(window: &[u8]) -> bool {
         .all(|(item, slice)| !slice.contains(&item))
 }
 
+fn solve_faster<const WINDOW_SIZE: usize>(input: &str) -> usize {
+    let mut slider = Slider::<WINDOW_SIZE>::new();
+    for &byte in input.as_bytes().iter() {
+        if slider.add_byte(byte) {
+            break;
+        }
+    }
+    slider.index
+}
+
+struct Slider<const C: usize> {
+    circular_window: [u8; C],
+    byte_counts: [u8; 256],
+    duplicate_count: usize,
+    index: usize,
+}
+
+impl<const C: usize> Slider<C> {
+    fn new() -> Self {
+        Self {
+            circular_window: [0; C],
+            byte_counts: [0; 256],
+            duplicate_count: 0,
+            index: 0,
+        }
+    }
+
+    fn add_byte(&mut self, byte: u8) -> bool {
+        // remove
+        let last_item = &mut self.circular_window[self.index % C];
+        if self.index >= C {
+            let byte_occurences = &mut self.byte_counts[*last_item as usize];
+            if *byte_occurences > 1 {
+                self.duplicate_count -= 1;
+            }
+            *byte_occurences -= 1;
+        }
+        // add
+        *last_item = byte;
+        let byte_occurences = &mut self.byte_counts[byte as usize];
+        *byte_occurences += 1;
+        if *byte_occurences > 1 {
+            self.duplicate_count += 1;
+        }
+        self.index += 1;
+        self.duplicate_count == 0 && self.index > C
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -53,16 +100,28 @@ mod tests {
 
     #[test]
     fn test_part1() {
-        assert_eq!(part1("mjqjpqmgbljsphdztnvjfqwrcgsmlb"), 7);
-        assert_eq!(part1("bvwbjplbgvbhsrlpgdmjqwftvncz"), 5);
-        assert_eq!(part1("nppdvjthqldpwncqszvftbrmjlhg"), 6);
-        assert_eq!(part1("nznrnfrfntjfmvfwmzdfjlvtqnbhcprsg"), 10);
-        assert_eq!(part1("zcfzfwzzqfrljwzlrfnpqdbhtmscgvjw"), 11);
-        assert_eq!(part1(INPUT), 1578);
+        let strings = [
+            "mjqjpqmgbljsphdztnvjfqwrcgsmlb",
+            "bvwbjplbgvbhsrlpgdmjqwftvncz",
+            "nppdvjthqldpwncqszvftbrmjlhg",
+            "nznrnfrfntjfmvfwmzdfjlvtqnbhcprsg",
+            "zcfzfwzzqfrljwzlrfnpqdbhtmscgvjw",
+            INPUT,
+        ];
+        let results = [7, 5, 6, 10, 11, 1578];
+        strings
+            .iter()
+            .zip(results.iter())
+            .for_each(|(&s, &r)| assert_eq!(solve::<4>(s), r));
+        strings
+            .iter()
+            .zip(results.iter())
+            .for_each(|(&s, &r)| assert_eq!(solve_faster::<4>(s), r));
     }
 
     #[test]
     fn test_part2() {
-        assert_eq!(part2(INPUT), 2178);
+        assert_eq!(solve::<14>(INPUT), 2178);
+        assert_eq!(solve_faster::<14>(INPUT), 2178);
     }
 }
