@@ -57,15 +57,11 @@ impl<'a> FileSystem<'a> {
         &mut self.directories[handle.0]
     }
 
-    fn add_size<'b>(&'b mut self, path: &'b [&'a str], size: u64) {
-        let mut p = path;
-        loop {
-            let handle = self.dir_handle(p);
-            self.dir_mut(handle).total_size += size;
-            if p.len() == 0 {
-                break;
-            }
-            p = &p[0..p.len() - 1];
+    fn add_size(&mut self, mut handle: Option<DirHandle>, size: u64) {
+        while let Some(curr_handle) = handle {
+            let dir = self.dir_mut(curr_handle);
+            dir.total_size += size;
+            handle = dir.parent;
         }
     }
 }
@@ -79,13 +75,31 @@ struct Shell<'a> {
 
 impl<'a> Shell<'a> {
     fn run_session<'b>(&'b mut self, input: &'a str) {
+        enum State {
+            Cmd,
+            Dir(u64),
+        }
+        use State::*;
+        let mut state = Cmd;
         for line in input.lines().filter(|line| !line.is_empty()) {
             let line = line.as_bytes();
-            if line[0] == b'$' {
-                self.process_command(&line[2..])
-            } else {
-                self.process_node(line)
+            match state {
+                Cmd => match line[0] {
+                    b'$' => self.process_command(&line[2..]),
+                    _ => state = Dir(self.process_node(line)),
+                },
+                Dir(size) => match line[0] {
+                    b'$' => {
+                        self.fs.add_size(self.dir_handle, size);
+                        self.process_command(&line[2..]);
+                        state = Cmd;
+                    }
+                    _ => state = Dir(size + self.process_node(line)),
+                },
             }
+        }
+        if let Dir(size) = state {
+            self.fs.add_size(self.dir_handle, size);
         }
     }
 
@@ -95,41 +109,35 @@ impl<'a> Shell<'a> {
             match rest {
                 b"\\" => {
                     self.pwd = Path::default();
-                    Self::update_dir_handle(self);
+                    let handle = self.fs.dir_handle(&self.pwd.0);
+                    self.dir_handle = Some(handle);
                 }
                 b".." => {
                     self.pwd.up();
-                    Self::update_dir_handle(self);
+                    let handle = self.fs.dir_handle(&self.pwd.0);
+                    self.dir_handle = Some(handle);
                 }
                 bytes => {
                     self.pwd
                         .down(unsafe { std::str::from_utf8_unchecked(bytes) });
-                    let handle = self.dir_handle;
-                    self.update_dir_handle();
-                    if let Some(child) = self.dir_handle {
-                        self.fs.dir_mut(child).parent = handle;
-                    }
+                    let child = self.fs.dir_handle(self.pwd.as_slice());
+                    self.fs.dir_mut(child).parent = self.dir_handle;
+                    self.dir_handle = Some(child);
                 }
             }
         }
     }
 
-    fn process_node<'b>(&'b mut self, line: &'a [u8]) {
-        let mut parts = unsafe { std::str::from_utf8_unchecked(line) }.split_whitespace();
-        let first = parts.next().unwrap();
+    fn process_node<'b>(&'b mut self, line: &'a [u8]) -> u64 {
+        let first = unsafe { std::str::from_utf8_unchecked(line) }
+            .split_whitespace()
+            .next()
+            .unwrap();
         if first == "dir" {
-            self.pwd.down(parts.next().unwrap());
-            self.fs.dir_handle(&self.pwd.as_slice());
-            self.pwd.up()
+            0
         } else {
-            self.fs
-                .add_size(self.pwd.as_slice(), first.parse::<u64>().unwrap());
+            first.parse::<u64>().unwrap()
         }
-    }
-
-    fn update_dir_handle<'b>(&'b mut self) {
-        let handle = self.fs.dir_handle(&self.pwd.0);
-        self.dir_handle = Some(handle);
     }
 }
 
