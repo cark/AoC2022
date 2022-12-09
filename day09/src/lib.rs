@@ -26,9 +26,9 @@ pub fn solve<const COUNT: usize>(input: &str) -> u64 {
     for direction in directions(input) {
         let head = &mut knots[0];
         *head = add_vec(*head, direction);
-        for w in indexes.windows(2) {
-            let head = knots[w[0]];
-            let tail = &mut knots[w[1]];
+        for window in indexes.windows(2) {
+            let head = knots[window[0]];
+            let tail = &mut knots[window[1]];
             let old_tail = *tail;
             *tail = follows(*tail, head);
             if old_tail == *tail {
