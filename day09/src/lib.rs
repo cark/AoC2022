@@ -21,8 +21,7 @@ fn set_bit(pos: Pos, slice: &mut [usize]) {
 pub fn solve<const COUNT: usize>(input: &str) -> u64 {
     let mut knots: [Pos; COUNT] = [Pos::default(); COUNT];
     let indexes: [usize; COUNT] = std::array::from_fn(|i| i);
-    let mut visited = Vec::with_capacity(1024 * 1024 / 64);
-    visited.resize(1024 * 1024 / 64, 0usize);
+    let mut visited = [0usize; 1024 * 1024 / 64];
     set_bit((0, 0), &mut visited);
     for direction in directions(input) {
         let head = &mut knots[0];
@@ -64,9 +63,7 @@ fn add_vec(vec1: Pos, vec2: Pos) -> Pos {
 fn follows(tail: Pos, head: Pos) -> Pos {
     let x_diff = head.0 - tail.0;
     let y_diff = head.1 - tail.1;
-    let x_abs = x_diff.abs();
-    let y_abs = y_diff.abs();
-    if x_abs > 1 || y_abs > 1 {
+    if x_diff.abs() > 1 || y_diff.abs() > 1 {
         add_vec(tail, (x_diff.signum(), y_diff.signum()))
     } else {
         tail
