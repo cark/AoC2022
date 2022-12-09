@@ -66,16 +66,10 @@ fn follows(tail: Pos, head: Pos) -> Pos {
     let y_diff = head.1 - tail.1;
     let x_abs = x_diff.abs();
     let y_abs = y_diff.abs();
-    if x_abs + y_abs > 2 {
+    if x_abs > 1 || y_abs > 1 {
         add_vec(tail, (x_diff.signum(), y_diff.signum()))
     } else {
-        if x_abs > 1 {
-            add_vec(tail, (x_diff.signum(), 0))
-        } else if y_abs > 1 {
-            add_vec(tail, (0, y_diff.signum()))
-        } else {
-            tail
-        }
+        tail
     }
 }
 
