@@ -20,7 +20,7 @@ fn set_bit(pos: Pos, slice: &mut [usize]) {
 
 pub fn solve<const COUNT: usize>(input: &str) -> u64 {
     let mut knots: [Pos; COUNT] = [Pos::default(); COUNT];
-    let indexes: [usize; COUNT] = std::array::from_fn(move |i| i);
+    let indexes: [usize; COUNT] = std::array::from_fn(|i| i);
     let mut visited = Vec::with_capacity(1024 * 1024 / 64);
     visited.resize(1024 * 1024 / 64, 0usize);
     set_bit((0, 0), &mut visited);
