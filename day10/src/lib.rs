@@ -1,14 +1,12 @@
 pub const INPUT: &str = include_str!("input.txt");
 
-use std::iter::{repeat, repeat_with};
+use std::{convert::identity, iter::repeat};
 
 fn signal_strengths(input: &str) -> impl Iterator<Item = i32> + '_ {
-    cycle_values(input)
-        .enumerate()
-        .map(|(i, x)| (i + 1) as i32 * x)
+    cycles(input).enumerate().map(|(i, x)| (i + 1) as i32 * x)
 }
 
-fn cycle_values(input: &str) -> impl Iterator<Item = i32> + '_ {
+fn cycles(input: &str) -> impl Iterator<Item = i32> + '_ {
     let mut x: i32 = 1;
     input
         .lines()
@@ -33,22 +31,22 @@ pub fn part1(input: &str) -> i32 {
     signal_strengths(input).skip(19).step_by(40).take(6).sum()
 }
 
+pub fn screen_chars(input: &str) -> impl Iterator<Item = char> + '_ {
+    cycles(input)
+        .map(|x| (x - 1)..=(x + 1))
+        .enumerate()
+        .flat_map(|(i, cursor)| {
+            let index = i as i32 % 40;
+            [
+                Some(if cursor.contains(&index) { '#' } else { '.' }),
+                if index == 39 { Some('\n') } else { None },
+            ]
+        })
+        .filter_map(identity)
+}
+
 pub fn part2(input: &str) {
-    let rows = repeat_with(|| (0..).take(40)).take(6);
-    let mut cursors = cycle_values(input).map(|x| (x - 1)..=(x + 1));
-    rows.for_each(move |index_iter| {
-        index_iter
-            .map(|index| {
-                let cursor = cursors.next().unwrap();
-                if cursor.contains(&index) {
-                    '#'
-                } else {
-                    '.'
-                }
-            })
-            .for_each(|c| print!("{}", c));
-        println!()
-    })
+    screen_chars(input).for_each(|c| print!("{}", c));
 }
 
 #[cfg(test)]
@@ -60,14 +58,13 @@ mod tests {
 addx 3
 addx -5
 ";
+    const TEST_SCREEN: &str = include_str!("test_screen.txt");
+    const PART2_RESULT: &str = include_str!("part2_result.txt");
 
     #[test]
     fn test_x_values() {
-        assert_eq!(cycle_values(SMALL_PROGRAM).count(), 5);
-        assert_eq!(
-            cycle_values(SMALL_PROGRAM).collect::<Vec<i32>>(),
-            [1, 1, 1, 4, 4]
-        );
+        assert_eq!(cycles(SMALL_PROGRAM).count(), 5);
+        assert_eq!(cycles(SMALL_PROGRAM).collect::<Vec<i32>>(), [1, 1, 1, 4, 4]);
     }
 
     #[test]
@@ -83,5 +80,21 @@ addx -5
     fn test_part1() {
         assert_eq!(part1(TEST_INPUT), 13140);
         assert_eq!(part1(INPUT), 11220);
+    }
+
+    #[test]
+    fn test_screen_chars() {
+        let mut result = String::new();
+        screen_chars(TEST_INPUT).for_each(|c| result.push(c));
+        assert_eq!(
+            result.trim().lines().collect::<Vec<_>>(),
+            TEST_SCREEN.trim().lines().collect::<Vec<_>>()
+        );
+        let mut result = String::new();
+        screen_chars(INPUT).for_each(|c| result.push(c));
+        assert_eq!(
+            result.trim().lines().collect::<Vec<_>>(),
+            PART2_RESULT.trim().lines().collect::<Vec<_>>()
+        );
     }
 }
