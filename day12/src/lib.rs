@@ -82,7 +82,9 @@ impl Board {
                     .filter_map(|(dx, dy)| {
                         let x = current.x + dx;
                         let y = current.y + dy;
-                        if x >= 0 && x < self.width as i32 && y >= 0 && y < self.height as i32 {
+                        if (0..self.width as i32).contains(&x)
+                            && (0..self.height as i32).contains(&y)
+                        {
                             Some(Pos::new(x, y))
                         } else {
                             None
