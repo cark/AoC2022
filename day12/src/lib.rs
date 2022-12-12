@@ -2,7 +2,7 @@
 
 pub const INPUT: &str = include_str!("input.txt");
 
-use std::{collections::VecDeque, ops::Sub};
+use std::collections::VecDeque;
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 struct Pos {
@@ -13,14 +13,6 @@ struct Pos {
 impl Pos {
     fn new(x: i32, y: i32) -> Self {
         Self { x, y }
-    }
-}
-
-impl Sub for Pos {
-    type Output = Pos;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Pos::new(self.x - rhs.x, self.y - rhs.y)
     }
 }
 
