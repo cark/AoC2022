@@ -72,8 +72,9 @@ impl Board {
         while let Some(current) = open_list.pop_front() {
             let current_index = self.pos_index(current);
             let current_elevation = self.elevation[current_index];
+            let curr_dist = tentative_dist[current_index];
             if is_dest(current) {
-                return tentative_dist[current_index];
+                return curr_dist;
             }
             for neighbour in
                 [(0, -1), (-1, 0), (1, 0), (0, 1)]
@@ -89,12 +90,11 @@ impl Board {
                     })
             {
                 let neighbour_index = self.pos_index(neighbour);
+                let neighbour_dist = &mut tentative_dist[neighbour_index];
                 let neighbour_elevation = self.elevation[neighbour_index];
                 if (current_elevation as i32 - 1..).contains(&(neighbour_elevation as i32)) {
-                    let curr_dist = tentative_dist[current_index];
-                    let neighbour_dist = tentative_dist[neighbour_index];
-                    if curr_dist + 1 < neighbour_dist {
-                        tentative_dist[neighbour_index] = curr_dist + 1;
+                    if curr_dist + 1 < *neighbour_dist {
+                        *neighbour_dist = curr_dist + 1;
                         open_list.push_back(neighbour);
                     }
                 }
