@@ -104,12 +104,6 @@ impl Board {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
-struct PosCost {
-    data: Pos,
-    cost: i32,
-}
-
 pub fn part1(input: &str) -> i32 {
     let board = Board::parse(input);
     board.dijkstra(|pos| pos == board.start)
