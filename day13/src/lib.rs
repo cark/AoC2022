@@ -73,9 +73,6 @@ fn is_ordered<'a>(
     loop {
         let pair = (left.next(), right.next());
         match pair {
-            (None, None) => return true,
-            (None, _) => unreachable!(),
-            (_, None) => unreachable!(),
             (Some(l), Some(r)) => match (l, r) {
                 (StartList, r) => match r {
                     StartList => {}
@@ -103,6 +100,9 @@ fn is_ordered<'a>(
                     }
                 },
             },
+            (None, None) => return true,
+            (None, _) => unreachable!(),
+            (_, None) => unreachable!(),
         }
     }
 }
