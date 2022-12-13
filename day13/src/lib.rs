@@ -2,19 +2,12 @@ pub const INPUT: &str = include_str!("input.txt");
 
 pub fn part1(input: &str) -> usize {
     let mut lines = input.lines().filter(|line| !line.is_empty());
-    std::iter::from_fn(move || {
-        if let Some(line1) = lines.next() {
-            let line2 = lines.next().unwrap();
-            Some((line1, line2))
-        } else {
-            None
-        }
-    })
-    .enumerate()
-    .filter_map(|(i, (l, r))| {
-        is_ordered(Box::new(tokenize(l)), Box::new(tokenize(r))).then_some(i + 1)
-    })
-    .sum()
+    std::iter::from_fn(move || lines.next().map(|line1| (line1, lines.next().unwrap())))
+        .enumerate()
+        .filter_map(|(i, (l, r))| {
+            is_ordered(Box::new(tokenize(l)), Box::new(tokenize(r))).then_some(i + 1)
+        })
+        .sum()
 }
 
 pub fn part2(input: &str) -> usize {
