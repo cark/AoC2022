@@ -10,14 +10,9 @@ pub fn part1(input: &str) -> usize {
             None
         }
     })
-    .map(|(left, right)| (tokenize(left), tokenize(right)))
     .enumerate()
     .filter_map(|(i, (l, r))| {
-        if is_ordered(Box::new(l), Box::new(r)) {
-            Some(i + 1)
-        } else {
-            None
-        }
+        is_ordered(Box::new(tokenize(l)), Box::new(tokenize(r))).then_some(i + 1)
     })
     .sum()
 }
@@ -36,13 +31,7 @@ pub fn part2(input: &str) -> usize {
     packets
         .into_iter()
         .enumerate()
-        .filter_map(|(i, packet)| {
-            if packet.s == "[[2]]" || packet.s == "[[6]]" {
-                Some(i + 1)
-            } else {
-                None
-            }
-        })
+        .filter_map(|(i, packet)| (packet.s == "[[2]]" || packet.s == "[[6]]").then_some(i + 1))
         .product()
 }
 
