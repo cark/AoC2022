@@ -1,4 +1,3 @@
-// 400 - 600
 pub const INPUT: &str = include_str!("input.txt");
 
 pub fn part1(input: &str) -> usize {
