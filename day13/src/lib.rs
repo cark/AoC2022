@@ -4,9 +4,7 @@ pub fn part1(input: &str) -> usize {
     let mut lines = input.lines().filter(|line| !line.is_empty());
     std::iter::from_fn(move || lines.next().map(|line1| (line1, lines.next().unwrap())))
         .enumerate()
-        .filter_map(|(i, (l, r))| {
-            is_ordered(Box::new(tokenize(l)), Box::new(tokenize(r))).then_some(i + 1)
-        })
+        .filter_map(|(i, (l, r))| is_ordered(&mut tokenize(l), &mut tokenize(r)).then_some(i + 1))
         .sum()
 }
 
@@ -71,8 +69,8 @@ fn tokenize(input: &str) -> impl Iterator<Item = Token> + '_ {
 }
 
 fn is_ordered<'a>(
-    mut left: Box<dyn Iterator<Item = Token> + 'a>,
-    mut right: Box<dyn Iterator<Item = Token> + 'a>,
+    left: &mut (dyn Iterator<Item = Token> + 'a),
+    right: &mut (dyn Iterator<Item = Token> + 'a),
 ) -> bool {
     use Token::*;
     loop {
@@ -86,10 +84,7 @@ fn is_ordered<'a>(
                     StartList => {}
                     EndList => return false,
                     Value(r) => {
-                        return is_ordered(
-                            left,
-                            Box::new([Value(r), EndList].into_iter().chain(right)),
-                        )
+                        return is_ordered(left, &mut [Value(r), EndList].into_iter().chain(right))
                     }
                 },
                 (EndList, r) => match r {
@@ -99,10 +94,7 @@ fn is_ordered<'a>(
                 },
                 (Value(l), r) => match r {
                     StartList => {
-                        return is_ordered(
-                            Box::new([Value(l), EndList].into_iter().chain(left)),
-                            right,
-                        )
+                        return is_ordered(&mut [Value(l), EndList].into_iter().chain(left), right)
                     }
                     EndList => return false,
                     Value(r) => {
@@ -133,8 +125,8 @@ impl PartialOrd for Packet<'_> {
 impl Ord for Packet<'_> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         if is_ordered(
-            Box::new(self.tokens.iter().copied()),
-            Box::new(other.tokens.iter().copied()),
+            &mut self.tokens.iter().copied(),
+            &mut other.tokens.iter().copied(),
         ) {
             core::cmp::Ordering::Less
         } else {
@@ -181,36 +173,30 @@ mod tests {
     #[test]
     fn test_is_ordered() {
         assert!(is_ordered(
-            Box::new(tokenize("[1,1,3,1,1]")),
-            Box::new(tokenize("[1,1,5,1,1]"))
+            &mut tokenize("[1,1,3,1,1]"),
+            &mut tokenize("[1,1,5,1,1]")
         ));
         assert!(is_ordered(
-            Box::new(tokenize("[[1],[2,3,4]]")),
-            Box::new(tokenize("[[1],4]"))
+            &mut tokenize("[[1],[2,3,4]]"),
+            &mut tokenize("[[1],4]")
         ));
         assert!(!is_ordered(
-            Box::new(tokenize("[9]")),
-            Box::new(tokenize("[[8,7,6]]"))
+            &mut tokenize("[9]"),
+            &mut tokenize("[[8,7,6]]")
         ));
         assert!(is_ordered(
-            Box::new(tokenize("[[4,4],4,4]")),
-            Box::new(tokenize("[[4,4],4,4,4]"))
+            &mut tokenize("[[4,4],4,4]"),
+            &mut tokenize("[[4,4],4,4,4]")
         ));
         assert!(!is_ordered(
-            Box::new(tokenize("[7,7,7,7]")),
-            Box::new(tokenize("[7,7,7]"))
+            &mut tokenize("[7,7,7,7]"),
+            &mut tokenize("[7,7,7]")
         ));
-        assert!(is_ordered(
-            Box::new(tokenize("[]")),
-            Box::new(tokenize("[3]"))
-        ));
+        assert!(is_ordered(&mut tokenize("[]"), &mut tokenize("[3]")));
+        assert!(!is_ordered(&mut tokenize("[[[]]]"), &mut tokenize("[[]]")));
         assert!(!is_ordered(
-            Box::new(tokenize("[[[]]]")),
-            Box::new(tokenize("[[]]"))
-        ));
-        assert!(!is_ordered(
-            Box::new(tokenize("[1,[2,[3,[4,[5,6,7]]]],8,9]")),
-            Box::new(tokenize("[1,[2,[3,[4,[5,6,0]]]],8,9]"))
+            &mut tokenize("[1,[2,[3,[4,[5,6,7]]]],8,9]"),
+            &mut tokenize("[1,[2,[3,[4,[5,6,0]]]],8,9]")
         ));
     }
     #[test]
