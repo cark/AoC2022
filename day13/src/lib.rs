@@ -9,18 +9,17 @@ pub fn part1(input: &str) -> usize {
 }
 
 pub fn part2(input: &str) -> usize {
-    let mut packets = input
-        .lines()
-        .filter(|line| !line.is_empty())
-        .chain(["[[2]]", "[[6]]"])
-        .map(|line| Packet(line))
-        .collect::<Vec<_>>();
-    packets.sort();
-    packets
-        .into_iter()
-        .enumerate()
-        .filter_map(|(i, packet)| (packet.0 == "[[2]]" || packet.0 == "[[6]]").then_some(i + 1))
-        .product()
+    fn index_of_virtual_packet(input: &str, virtual_packet: &str) -> usize {
+        1 + input
+            .lines()
+            .filter(|line| !line.is_empty())
+            .filter(|line| is_ordered(&mut tokenize(line), &mut tokenize(virtual_packet)))
+            .count()
+    }
+
+    let index2 = index_of_virtual_packet(input, "[[2]]");
+    let index6 = index_of_virtual_packet(input, "[[6]]") + 1;
+    index2 * index6
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -105,35 +104,6 @@ fn is_ordered<'a>(
             (_, None) => unreachable!(),
         }
     }
-}
-
-#[derive(Debug)]
-struct Packet<'a>(&'a str);
-
-impl PartialOrd for Packet<'_> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Packet<'_> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if is_ordered(&mut tokenize(self.0), &mut tokenize(other.0)) {
-            core::cmp::Ordering::Less
-        } else {
-            core::cmp::Ordering::Greater
-        }
-    }
-}
-
-impl PartialEq for Packet<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
-impl Eq for Packet<'_> {
-    fn assert_receiver_is_total_eq(&self) {}
 }
 
 #[cfg(test)]
