@@ -1,4 +1,4 @@
-// turns out that dijsktra is faster than a-star even for part1
+// turns out that bfs is faster than a-star even for part1
 
 pub const INPUT: &str = include_str!("input.txt");
 
@@ -63,7 +63,7 @@ impl Board {
         pos.x as usize + pos.y as usize * self.width
     }
 
-    fn dijkstra(&self, is_dest: impl Fn(Pos) -> bool) -> i32 {
+    fn bfs(&self, is_dest: impl Fn(Pos) -> bool) -> i32 {
         let mut tentative_dist = Vec::with_capacity(self.elevation.len());
         tentative_dist.resize(self.elevation.len(), i32::MAX);
         tentative_dist[self.pos_index(self.dest)] = 0;
@@ -108,12 +108,12 @@ impl Board {
 
 pub fn part1(input: &str) -> i32 {
     let board = Board::parse(input);
-    board.dijkstra(|pos| pos == board.start)
+    board.bfs(|pos| pos == board.start)
 }
 
 pub fn part2(input: &str) -> i32 {
     let board = Board::parse(input);
-    board.dijkstra(|pos| board.elevation[board.pos_index(pos)] == 0)
+    board.bfs(|pos| board.elevation[board.pos_index(pos)] == 0)
 }
 
 #[cfg(test)]
