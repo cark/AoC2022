@@ -1,3 +1,4 @@
+// 400 - 600
 pub const INPUT: &str = include_str!("input.txt");
 
 pub fn part1(input: &str) -> usize {
@@ -13,16 +14,13 @@ pub fn part2(input: &str) -> usize {
         .lines()
         .filter(|line| !line.is_empty())
         .chain(["[[2]]", "[[6]]"])
-        .map(|line| Packet {
-            s: line,
-            tokens: tokenize(line).collect(),
-        })
+        .map(|line| Packet(line))
         .collect::<Vec<_>>();
     packets.sort();
     packets
         .into_iter()
         .enumerate()
-        .filter_map(|(i, packet)| (packet.s == "[[2]]" || packet.s == "[[6]]").then_some(i + 1))
+        .filter_map(|(i, packet)| (packet.0 == "[[2]]" || packet.0 == "[[6]]").then_some(i + 1))
         .product()
 }
 
@@ -111,10 +109,7 @@ fn is_ordered<'a>(
 }
 
 #[derive(Debug)]
-struct Packet<'a> {
-    s: &'a str,
-    tokens: Vec<Token>,
-}
+struct Packet<'a>(&'a str);
 
 impl PartialOrd for Packet<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -124,10 +119,7 @@ impl PartialOrd for Packet<'_> {
 
 impl Ord for Packet<'_> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if is_ordered(
-            &mut self.tokens.iter().copied(),
-            &mut other.tokens.iter().copied(),
-        ) {
+        if is_ordered(&mut tokenize(self.0), &mut tokenize(other.0)) {
             core::cmp::Ordering::Less
         } else {
             core::cmp::Ordering::Greater
@@ -137,7 +129,7 @@ impl Ord for Packet<'_> {
 
 impl PartialEq for Packet<'_> {
     fn eq(&self, other: &Self) -> bool {
-        self.s == other.s
+        self.0 == other.0
     }
 }
 
