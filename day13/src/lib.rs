@@ -23,7 +23,7 @@ pub fn part1(input: &str) -> usize {
 }
 
 pub fn part2(input: &str) -> usize {
-    let mut tokens = input
+    let mut packets = input
         .lines()
         .filter(|line| !line.is_empty())
         .chain(["[[2]]", "[[6]]"])
@@ -32,8 +32,8 @@ pub fn part2(input: &str) -> usize {
             tokens: tokenize(line).collect(),
         })
         .collect::<Vec<_>>();
-    tokens.sort();
-    tokens
+    packets.sort();
+    packets
         .into_iter()
         .enumerate()
         .filter_map(|(i, packet)| {
@@ -144,20 +144,20 @@ struct Packet<'a> {
 
 impl PartialOrd for Packet<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        if is_ordered(
-            Box::new(self.tokens.iter().copied()),
-            Box::new(other.tokens.iter().copied()),
-        ) {
-            Some(core::cmp::Ordering::Less)
-        } else {
-            Some(core::cmp::Ordering::Greater)
-        }
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for Packet<'_> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
+        if is_ordered(
+            Box::new(self.tokens.iter().copied()),
+            Box::new(other.tokens.iter().copied()),
+        ) {
+            core::cmp::Ordering::Less
+        } else {
+            core::cmp::Ordering::Greater
+        }
     }
 }
 
