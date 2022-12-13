@@ -31,36 +31,29 @@ enum Token {
 
 fn tokenize(input: &str) -> impl Iterator<Item = Token> + '_ {
     use Token::*;
-    let mut start = 0;
-    std::iter::from_fn(move || {
-        loop {
-            if start == input.len() {
-                break;
-            }
-            match input.as_bytes()[start] {
-                b'[' => {
-                    start += 1;
-                    return Some(StartList);
-                }
-                b']' => {
-                    start += 1;
-                    return Some(EndList);
-                }
-                b',' => {
-                    start += 1;
-                }
-                _digit => {
-                    let len = input[start..]
-                        .chars()
-                        .take_while(char::is_ascii_digit)
-                        .count();
-                    let result = Some(Value(input[start..start + len].parse().unwrap()));
-                    start += len;
-                    return result;
+    let mut bytes = input.as_bytes().iter().peekable();
+    std::iter::from_fn(move || loop {
+        if let Some(&byte) = bytes.next() {
+            match byte {
+                b'[' => return Some(StartList),
+                b']' => return Some(EndList),
+                b',' => {}
+                digit => {
+                    let mut value = digit - b'0';
+                    while let Some(&byte) = bytes.peek() {
+                        if (b'0'..=b'9').contains(byte) {
+                            bytes.next();
+                            value = value * 10 + byte - b'0';
+                        } else {
+                            break;
+                        }
+                    }
+                    return Some(Value(value));
                 }
             }
+        } else {
+            return None;
         }
-        None
     })
 }
 
