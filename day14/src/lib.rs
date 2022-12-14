@@ -1,3 +1,4 @@
+// 150 320
 pub const INPUT: &str = include_str!("input.txt");
 
 use std::ops::{Add, Sub};
@@ -6,6 +7,7 @@ const DROP_POINT: Pos = Pos::new(500, 0);
 const DOWN: Pos = Pos::new(0, 1);
 const DOWN_LEFT: Pos = Pos::new(-1, 1);
 const DOWN_RIGHT: Pos = Pos::new(1, 1);
+const DIRECTIONS: [Pos; 3] = [DOWN, DOWN_LEFT, DOWN_RIGHT];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct Pos {
@@ -96,34 +98,24 @@ impl Reservoir {
             && (self.top_left.y..=self.bottom_right.y).contains(&pos.y)
     }
 
-    fn drop_sand(&mut self, mut pos: Pos) -> bool {
-        loop {
-            if self.is_occupied(pos) && pos == DROP_POINT {
-                return false;
-            }
-            let new_pos = [DOWN, DOWN_LEFT, DOWN_RIGHT]
-                .into_iter()
-                .map(|offset| pos + offset)
-                .find(|p| !self.is_occupied(*p));
-            if let Some(new_pos) = new_pos {
-                pos = new_pos;
-                if !self.in_bounds(pos) {
-                    return false;
+    fn depth_first(&mut self, pos: Pos) -> (bool, u64) {
+        if !self.in_bounds(pos) {
+            (true, 0)
+        } else {
+            let mut children_count = 0;
+            for dir in DIRECTIONS {
+                let new_pos = pos + dir;
+                if !self.is_occupied(new_pos) {
+                    let (found, count) = self.depth_first(new_pos);
+                    children_count += count;
+                    if found {
+                        return (true, children_count);
+                    }
                 }
-            } else {
-                self.set_occupied(pos);
-                return true;
             }
+            self.set_occupied(pos);
+            (false, children_count + 1)
         }
-    }
-
-    fn simulate(&mut self) -> u64 {
-        for i in 0.. {
-            if !self.drop_sand(DROP_POINT) {
-                return i;
-            }
-        }
-        unreachable!()
     }
 }
 
@@ -183,11 +175,24 @@ fn find_bounds(input: &str) -> (Pos, Pos) {
 }
 
 pub fn part1(input: &str) -> u64 {
-    Reservoir::from_input(input, false).simulate()
+    Reservoir::from_input(input, false)
+        .depth_first(DROP_POINT)
+        .1
 }
 
 pub fn part2(input: &str) -> u64 {
-    Reservoir::from_input(input, true).simulate()
+    Reservoir::from_input(input, true).depth_first(DROP_POINT).1
+}
+
+#[allow(dead_code)]
+fn draw(reservoir: &Reservoir) {
+    for (i, val) in reservoir.occupancy.iter().enumerate() {
+        if i % reservoir.size.x as usize == 0 {
+            println!();
+        }
+        print!("{}", if *val { '#' } else { '.' });
+    }
+    println!();
 }
 
 #[cfg(test)]
@@ -220,15 +225,8 @@ mod tests {
 
     #[test]
     fn test_from_input() {
-        let reservoir = Reservoir::from_input(TEST_INPUT, false);
-        for y in reservoir.top_left.y..=reservoir.bottom_right.y {
-            println!();
-            for x in reservoir.top_left.x..=reservoir.bottom_right.x {
-                let pos = Pos::new(x, y);
-                print!("{}", if reservoir.is_occupied(pos) { '#' } else { '.' });
-            }
-        }
-        println!();
+        // let reservoir = Reservoir::from_input(TEST_INPUT, false);
+        // draw(&reservoir)
         // assert!(false);
     }
 
