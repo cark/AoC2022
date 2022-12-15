@@ -1,11 +1,23 @@
 pub const INPUT: &str = include_str!("input.txt");
 
-use std::ops::RangeInclusive;
+type Pos = (i64, i64);
 
-type Pos = (i32, i32);
-type Range = (i32, i32);
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+struct Range {
+    start: i64,
+    end: i64,
+}
 
-fn manhattan(p1: Pos, p2: Pos) -> i32 {
+impl Range {
+    fn new(start: i64, end: i64) -> Self {
+        Self { start, end }
+    }
+    fn contains(&self, value: i64) -> bool {
+        value >= self.start && value <= self.end
+    }
+}
+
+fn manhattan(p1: Pos, p2: Pos) -> i64 {
     (p1.0 - p2.0).abs() + (p1.1 - p2.1).abs()
 }
 
@@ -13,16 +25,16 @@ fn manhattan(p1: Pos, p2: Pos) -> i32 {
 struct Sensor {
     pos: Pos,
     beacon: Pos,
-    dist: i32,
+    dist: i64,
 }
 
-pub fn part1(input: &str, y: i32) -> u32 {
+pub fn part1(input: &str, y: i64) -> u64 {
     let sensors = parse(input);
     // get ranges covered by each sensor on this line
     let mut ranges = sensor_ranges_at_line(&sensors, y);
 
     // merge the ranges
-    ranges.sort_unstable_by_key(|r| *r.start());
+    ranges.sort_unstable_by_key(|r| r.start);
     let merged = merge_ranges(&ranges);
 
     // Sum the sizes of all these ranges, taking care of removing
@@ -33,9 +45,9 @@ pub fn part1(input: &str, y: i32) -> u32 {
         .map(|range| {
             // there can be multiple beacons on a line
             beacons_in_range(&sensors, range, y, &mut included_beacons);
-            (range.end() - range.start() + 1) as usize - included_beacons.len()
+            (range.end - range.start + 1) as usize - included_beacons.len()
         })
-        .sum::<usize>() as u32
+        .sum::<usize>() as u64
 }
 
 fn parse_pos(s: &str) -> Pos {
@@ -70,41 +82,44 @@ fn parse(input: &str) -> Vec<Sensor> {
     result
 }
 
-fn sensor_ranges_at_line(sensors: &[Sensor], y: i32) -> Vec<RangeInclusive<i32>> {
+fn sensor_ranges_at_line(sensors: &[Sensor], y: i64) -> Vec<Range> {
     sensors
         .iter()
         .filter_map(move |sensor| sensor_range_at_line(sensor, y))
         .collect()
 }
 
-fn sensor_range_at_line(sensor: &Sensor, y: i32) -> Option<RangeInclusive<i32>> {
+fn sensor_range_at_line(sensor: &Sensor, y: i64) -> Option<Range> {
     let half_size = sensor.dist - (y - sensor.pos.1).abs();
     let range_size = half_size * 2 + 1;
     if range_size > 0 {
-        Some(sensor.pos.0 - half_size..=sensor.pos.0 + half_size)
+        Some(Range::new(
+            sensor.pos.0 - half_size,
+            sensor.pos.0 + half_size,
+        ))
     } else {
         None
     }
 }
 
-fn merge_ranges(sorted_ranges: &[RangeInclusive<i32>]) -> Vec<RangeInclusive<i32>> {
+fn merge_ranges(sorted_ranges: &[Range]) -> Vec<Range> {
     let mut result = Vec::with_capacity(sorted_ranges.len());
     let mut index = 0;
-    let mut current = sorted_ranges.get(index).cloned();
+    let mut current = sorted_ranges.get(index).copied();
     loop {
         let next = sorted_ranges.get(index);
         index += 1;
-        match (current, next.cloned()) {
+        match (current, next) {
             (Some(r1), None) => {
                 result.push(r1);
                 return result;
             }
-            (Some(r1), Some(r2)) if r1.contains(r2.start()) => {
-                current = Some(*r1.start()..=*r1.end().max(&r2.end()))
+            (Some(r1), Some(r2)) if r1.contains(r2.start) => {
+                current = Some(Range::new(r1.start, r1.end.max(r2.end)))
             }
-            (Some(r1), Some(r2)) => {
-                if *r1.end() + 1 == *r2.start() {
-                    current = Some(*r1.start()..=*r1.end().max(&r2.end()))
+            (Some(r1), Some(&r2)) => {
+                if r1.end + 1 == r2.start {
+                    current = Some(Range::new(r1.start, r1.end.max(r2.end)))
                 } else {
                     current = Some(r2);
                     result.push(r1);
@@ -115,50 +130,36 @@ fn merge_ranges(sorted_ranges: &[RangeInclusive<i32>]) -> Vec<RangeInclusive<i32
     }
 }
 
-fn beacons_in_range(
-    sensors: &[Sensor],
-    range: &RangeInclusive<i32>,
-    y: i32,
-    into_vec: &mut Vec<(i32, i32)>,
-) {
+fn beacons_in_range(sensors: &[Sensor], range: &Range, y: i64, into_vec: &mut Vec<(i64, i64)>) {
     into_vec.clear();
     for s in sensors {
-        if s.beacon.1 == y && range.contains(&s.beacon.0) && !into_vec.contains(&s.beacon) {
+        if s.beacon.1 == y && range.contains(s.beacon.0) && !into_vec.contains(&s.beacon) {
             into_vec.push(s.beacon);
         }
     }
 }
 
-pub fn part2(input: &str, max_pos: Pos) -> u32 {
+pub fn part2(input: &str, max_pos: Pos) -> u64 {
     let sensors = parse(input);
     for y in 0..=max_pos.1 {
         let mut ranges = sensor_ranges_at_line(&sensors, y)
             .iter()
             .filter_map(|r| {
-                if *r.end() < 0 {
+                if r.end < 0 {
                     None
-                } else if *r.start() > max_pos.0 {
+                } else if r.start > max_pos.0 {
                     None
                 } else {
-                    Some(*r.start().max(&0)..=*r.end().min(&max_pos.0))
+                    Some(Range::new(r.start.max(0), r.end.min(max_pos.0)))
                 }
             })
             .collect::<Vec<_>>();
-        ranges.sort_unstable_by_key(|r| *r.start());
+        ranges.sort_unstable_by_key(|r| r.start);
         let merged = merge_ranges(&ranges);
         if merged.len() > 1 {
-            let x = *merged[0].end() as u32 + 1;
-            let y = y as u32;
-
-            println!(
-                "found : {}, {y}, len={}, 0={:?}, 1={:?}",
-                x,
-                merged.len(),
-                merged[0],
-                merged[1]
-            );
+            let x = merged[0].end as u64 + 1;
+            let y = y as u64;
             return 4000000 * x + y;
-            //todo!("************ got line : {y}, {}", merged.len());
         }
     }
     unreachable!();
@@ -184,7 +185,7 @@ mod tests {
         ];
         for (y, result) in (-2..16).zip(results) {
             let r = sensor_range_at_line(&sensor, y).unwrap();
-            assert_eq!(*r.end() - *r.start() + 1, result);
+            assert_eq!(r.end - r.start + 1, result);
         }
         println!("{:?}", sensors[6]);
     }
@@ -193,11 +194,10 @@ mod tests {
     fn draw_covered() {
         let sensors = parse(TEST_INPUT);
         println!("using sensor_ranges_at_line");
-        //let mut line = String::with_capacity(21);
         for y in 0..20 {
             let mut chars = [b' '; 21];
             sensor_ranges_at_line(&sensors, y).iter().for_each(|r| {
-                r.clone().for_each(|x| {
+                (r.start..=r.end).for_each(|x| {
                     if x >= 0 && x <= 20 {
                         chars[x as usize] = b'#';
                     }
@@ -211,16 +211,16 @@ mod tests {
             let mut ranges = sensor_ranges_at_line(&sensors, y)
                 .iter()
                 .filter_map(|r| {
-                    if *r.end() < 0 {
+                    if r.end < 0 {
                         None
-                    } else if *r.start() > 20 {
+                    } else if r.start > 20 {
                         None
                     } else {
-                        Some(*r.start().max(&0)..=*r.end().min(&20))
+                        Some(Range::new(r.start.max(0), r.end.min(20)))
                     }
                 })
                 .collect::<Vec<_>>();
-            ranges.sort_unstable_by_key(|r| *r.start());
+            ranges.sort_unstable_by_key(|r| r.start);
             let mut chars = [b' '; 21];
             let merged = merge_ranges(&ranges);
             print!("{}", merged.len());
@@ -228,7 +228,7 @@ mod tests {
                 print!("{:?}", &merged);
             }
             merged.iter().for_each(|r| {
-                r.clone().for_each(|x| {
+                (r.start..=r.end).for_each(|x| {
                     if x >= 0 && x <= 20 {
                         chars[x as usize] = b'#';
                     }
@@ -239,14 +239,6 @@ mod tests {
         //assert!(false)
     }
 
-    // #[test]
-    // fn test_ranges_at_line() {
-    //     let sensors = parse(TEST_INPUT);
-    //     let ranges = ranges_at_line(&sensors, 10).collect::<Vec<_>>();
-    //     println!("{ranges:?}");
-    //     assert!(false);
-    // }
-
     #[test]
     fn test_part1() {
         assert_eq!(part1(TEST_INPUT, 10), 26);
@@ -255,10 +247,7 @@ mod tests {
 
     #[test]
     fn test_part2() {
-        // result is not 3942259753
-        // part2(TEST_INPUT, (20, 20));
-        // assert!(false);
         assert_eq!(part2(TEST_INPUT, (20, 20)), 56000011);
-        // assert_eq!(part2(INPUT), 27426);
+        assert_eq!(part2(INPUT, (4000000, 4000000)), 13743542639657);
     }
 }
