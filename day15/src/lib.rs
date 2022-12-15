@@ -1,6 +1,6 @@
 pub const INPUT: &str = include_str!("input.txt");
 
-use std::{convert::identity, ops::RangeInclusive};
+use std::ops::RangeInclusive;
 
 type Pos = (i32, i32);
 
@@ -75,68 +75,67 @@ fn parse(input: &str) -> Vec<Sensor> {
 //         .count() as u32
 // }
 
-fn ranges_at_line<'a>(
-    sensors: &'a [Sensor],
-    y: i32,
-) -> impl Iterator<Item = RangeInclusive<i32>> + 'a {
-    sensors.iter().filter_map(move |sensor| {
-        let half_size = sensor.dist - (y - sensor.pos.1).abs();
-        let range_size = half_size * 2 + 1;
-        if range_size > 0 {
-            Some(sensor.pos.0 - half_size..=sensor.pos.0 + half_size)
-        } else {
-            None
-        }
-    })
+fn ranges_at_line(sensors: &[Sensor], y: i32) -> Vec<RangeInclusive<i32>> {
+    sensors
+        .iter()
+        .filter_map(move |sensor| {
+            let half_size = sensor.dist - (y - sensor.pos.1).abs();
+            let range_size = half_size * 2 + 1;
+            if range_size > 0 {
+                Some(sensor.pos.0 - half_size..=sensor.pos.0 + half_size)
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
-fn merge_ranges(ranges: &mut [RangeInclusive<i32>], into_vec: &mut Vec<RangeInclusive<i32>>) {
-    ranges.sort_by_key(|range| *range.start());
-    into_vec.clear();
+fn merge_ranges(sorted_ranges: &[RangeInclusive<i32>]) -> Vec<RangeInclusive<i32>> {
+    let mut result = Vec::with_capacity(sorted_ranges.len());
     let mut index = 0;
-    let mut current = ranges.get(index).cloned();
+    let mut current = sorted_ranges.get(index).cloned();
     loop {
-        let next = ranges.get(index);
+        let next = sorted_ranges.get(index);
         index += 1;
         match (current, next.cloned()) {
             (Some(r1), None) => {
-                into_vec.push(r1);
-                return;
+                result.push(r1);
+                return result;
             }
             (Some(r1), Some(r2)) if r1.contains(r2.start()) => {
                 current = Some(*r1.start()..=*r1.end().max(&r2.end()))
             }
             (Some(r1), Some(r2)) => {
                 current = Some(r2);
-                into_vec.push(r1);
+                result.push(r1);
             }
-            (None, _) => return,
+            (None, _) => return result,
         }
     }
 }
 
-fn punch_range(
-    range: RangeInclusive<i32>,
-    sorted_holes: &[RangeInclusive<i32>],
-    into_vec: &mut Vec<RangeInclusive<i32>>,
-) {
-    into_vec.clear();
-    let mut current = range;
-    for hole in sorted_holes {
-        match (hole.contains(current.start()), hole.contains(current.end())) {
-            (true, true) => return,
-            (true, false) => current = *hole.end() + 1..=*current.end(),
-            (false, true) => {
-                into_vec.push(*current.start()..=*hole.start() - 1);
-                return;
-            }
-            (false, false) => {
-                into_vec.push(*current.start()..=*hole.start() - 1);
-                current = *hole.end() + 1..=*current.end();
-            }
-        }
-    }
-}
+// fn punch_range(
+//     range: RangeInclusive<i32>,
+//     sorted_holes: &[RangeInclusive<i32>],
+//     into_vec: &mut Vec<RangeInclusive<i32>>,
+// ) {
+//     into_vec.clear();
+//     let mut current = range;
+//     for hole in sorted_holes {
+//         match (hole.contains(current.start()), hole.contains(current.end())) {
+//             (true, true) => return,
+//             (true, false) => current = *hole.end() + 1..=*current.end(),
+//             (false, true) => {
+//                 into_vec.push(*current.start()..=*hole.start() - 1);
+//                 return;
+//             }
+//             (false, false) => {
+//                 into_vec.push(*current.start()..=*hole.start() - 1);
+//                 current = *hole.end() + 1..=*current.end();
+//             }
+//         }
+//     }
+// }
 
 fn beacons_in_range(
     sensors: &[Sensor],
@@ -154,42 +153,17 @@ fn beacons_in_range(
 
 pub fn part1(input: &str, y: i32) -> u32 {
     let sensors = parse(input);
-    let mut ranges = Vec::with_capacity(sensors.len());
-    ranges_at_line(&sensors, y).for_each(|r| ranges.push(r));
-    //println!("ranges: len={} data={:?}", ranges.len(), ranges);
-    let mut merged = Vec::with_capacity(sensors.len());
-    merge_ranges(&mut ranges, &mut merged);
-    //println!("merged ranges: len={} data={:?}", merged.len(), merged);
-    // let (min_x, max_x) = sensors
-    //     .iter()
-    //     .fold((i32::MAX, i32::MIN), |(min, max), sensor| {
-    //         (
-    //             min.min(sensor.pos.0 - sensor.dist),
-    //             max.max(sensor.pos.0 + sensor.dist),
-    //         )
-    //     });
-
+    let mut ranges = ranges_at_line(&sensors, y);
+    ranges.sort_unstable_by_key(|r| *r.start());
+    let merged = merge_ranges(&ranges);
     let mut included_beacons = Vec::with_capacity(sensors.len());
     merged
         .iter()
         .map(|range| {
-            //println!("{}", (range.end() - range.start() + 1));
             beacons_in_range(&sensors, range, y, &mut included_beacons);
             (range.end() - range.start() + 1) as usize - included_beacons.len()
         })
         .sum::<usize>() as u32
-
-    // sensors.iter().fold(merged.len(), |result, sensor| {
-    //     if sensor.beacon.1 == y && {
-    //         result - 1
-    //     } else {
-    //         result
-    //     }
-    // })
-    // let mut punched = Vec::with_capacity(sensors.len());
-    // punch_range(min_x..=max_x, &merged, &mut punched);
-    // println!("punched: len={} data={:?}", punched.len(), punched);
-    // todo!()
 }
 
 #[cfg(test)]
