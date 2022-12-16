@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeSet, HashSet},
-    convert::identity,
-};
+use std::convert::identity;
 
 pub const INPUT: &str = include_str!("input.txt");
 
@@ -54,6 +51,45 @@ pub fn part1(input: &str, y: i64) -> u64 {
             (range.end - range.start + 1) as usize - included_beacons.len()
         })
         .sum::<usize>() as u64
+}
+
+pub fn better_part2(input: &str, max_pos: Pos) -> u64 {
+    let sensors = parse(input);
+    // find edges of all diamond shaped scanning areas
+    let edges = edges(&sensors);
+    let mut interesting_ys = Vec::with_capacity(edges.len() * edges.len() * 4);
+    for i in 0..edges.len() {
+        for j in 0..edges.len() {
+            // find intersections of all segments with all other segments
+            // keeping only the y values
+            points_of_interest(&edges, i, j)
+                .into_iter()
+                .filter_map(identity)
+                .for_each(|y| {
+                    if y >= 0 && y <= max_pos.1 {
+                        interesting_ys.push(y);
+                    }
+                });
+        }
+    }
+    // iterate over our interesting lines, skipping duplicates
+    let mut last_y = -1;
+    for y in interesting_ys.into_iter() {
+        if y == last_y {
+            continue;
+        }
+        last_y = y;
+        // do part 1
+        let mut ranges = sensor_ranges_at_line(&sensors, y);
+        ranges.sort_unstable_by_key(|r| r.start);
+        let merged = merge_ranges(&ranges);
+        if merged.len() > 1 {
+            let x = merged[0].end as u64 + 1;
+            let y = y as u64;
+            return 4000000 * x + y;
+        }
+    }
+    unreachable!()
 }
 
 pub fn part2(input: &str, max_pos: Pos) -> u64 {
@@ -164,31 +200,9 @@ fn beacons_in_range(sensors: &[Sensor], range: &Range, y: i64, into_vec: &mut Ve
     }
 }
 
-/// We're returning the vertices of each of our diamond shapes.
-/// We also return the edges. First the two looking like this: /.
+/// We return the edges of ou diamons shapes. First the two looking like this: /.
 /// Then the two looking like this: \.
 /// The edges always start with the smallest x value.
-fn vertices_and_edges(sensors: &[Sensor]) -> (Vec<Pos>, Vec<Edge>) {
-    let mut vertices = Vec::with_capacity(sensors.len() * 4);
-    let mut edges = Vec::with_capacity(sensors.len() * 4);
-    for sensor in sensors {
-        let p = sensor.pos;
-        let left = (p.0 - sensor.dist, p.1);
-        let right = (p.0 + sensor.dist, p.1);
-        let top = (p.0, p.1 - sensor.dist);
-        let bottom = (p.0, p.1 + sensor.dist);
-        vertices.push(left);
-        vertices.push(right);
-        vertices.push(top);
-        vertices.push(bottom);
-        edges.push((left, top));
-        edges.push((bottom, right));
-        edges.push((top, right));
-        edges.push((left, bottom));
-    }
-    (vertices, edges)
-}
-
 fn edges(sensors: &[Sensor]) -> Vec<Edge> {
     let mut edges = Vec::with_capacity(sensors.len() * 4);
     for sensor in sensors {
@@ -258,37 +272,10 @@ fn y_intersection((a1, b1): (i64, i64), (a2, b2): (i64, i64)) -> [Option<i64>; 2
     }
 }
 
-pub fn better_part2(input: &str, max_pos: Pos) -> u64 {
-    let sensors = parse(input);
-    let edges = edges(&sensors);
-    let mut interesting_ys = BTreeSet::new();
-    for i in 0..edges.len() {
-        for j in 0..edges.len() {
-            points_of_interest(&edges, i, j)
-                .into_iter()
-                .filter_map(identity)
-                .for_each(|y| {
-                    if y >= 0 && y <= max_pos.1 {
-                        interesting_ys.insert(y);
-                    }
-                });
-        }
-    }
-    for y in interesting_ys.into_iter() {
-        let mut ranges = sensor_ranges_at_line(&sensors, y);
-        ranges.sort_unstable_by_key(|r| r.start);
-        let merged = merge_ranges(&ranges);
-        if merged.len() > 1 {
-            let x = merged[0].end as u64 + 1;
-            let y = y as u64;
-            return 4000000 * x + y;
-        }
-    }
-    unreachable!()
-}
-
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use super::*;
 
     const TEST_INPUT: &str = include_str!("test_input.txt");
@@ -405,8 +392,7 @@ mod tests {
     }
     #[test]
     fn test_better_part2() {
-        assert_eq!(better_part2(INPUT, (4000000, 4000000)), 13743542639657);
         assert_eq!(better_part2(TEST_INPUT, (20, 20)), 56000011);
-        //assert_eq!(part2(INPUT, (4000000, 4000000)), 13743542639657);
+        assert_eq!(better_part2(INPUT, (4000000, 4000000)), 13743542639657);
     }
 }
