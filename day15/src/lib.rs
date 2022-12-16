@@ -79,7 +79,7 @@ pub fn better_part2(input: &str, max_pos: Pos) -> u64 {
             continue;
         }
         last_y = y;
-        // do part 1
+        // now it's like brute force part2
         let mut ranges = sensor_ranges_at_line(&sensors, y);
         ranges.sort_unstable_by_key(|r| r.start);
         let merged = merge_ranges(&ranges);
@@ -234,11 +234,6 @@ fn points_of_interest(edges: &[Edge], index1: usize, index2: usize) -> [Option<i
         // parallels
         return [None; 2];
     }
-    // if ((index1 % 4) / 2) == ((index2 % 4) / 2) {
-    //     // both edges have the same direction
-    //     return [None, None];
-    // }
-
     let [y1, y2] = y_intersection(line_params(edge1.0, edge1.1), line_params(edge2.0, edge2.1));
     [
         y1.and_then(|y| (edge_contains_y(edge1, y) && edge_contains_y(edge2, y)).then_some(y)),
