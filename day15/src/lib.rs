@@ -1,6 +1,12 @@
+use std::{
+    collections::{BTreeSet, HashSet},
+    convert::identity,
+};
+
 pub const INPUT: &str = include_str!("input.txt");
 
 type Pos = (i64, i64);
+type Edge = (Pos, Pos);
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 struct Range {
@@ -48,6 +54,25 @@ pub fn part1(input: &str, y: i64) -> u64 {
             (range.end - range.start + 1) as usize - included_beacons.len()
         })
         .sum::<usize>() as u64
+}
+
+pub fn part2(input: &str, max_pos: Pos) -> u64 {
+    // Naive version, same as part1 for each line,
+    // only we're now looking for a line with 2 merged ranges.
+    // the hole is between these 2 ranges
+    let sensors = parse(input);
+    for y in 0..=max_pos.1 {
+        let mut ranges = sensor_ranges_at_line(&sensors, y);
+        ranges.sort_unstable_by_key(|r| r.start);
+        let merged = merge_ranges(&ranges);
+        if merged.len() > 1 {
+            let x = merged[0].end as u64 + 1;
+            let y = y as u64;
+            //println!("({x}, {y})"); // 2639657
+            return 4000000 * x + y;
+        }
+    }
+    unreachable!();
 }
 
 fn parse_pos(s: &str) -> Pos {
@@ -139,21 +164,118 @@ fn beacons_in_range(sensors: &[Sensor], range: &Range, y: i64, into_vec: &mut Ve
     }
 }
 
-pub fn part2(input: &str, max_pos: Pos) -> u64 {
+/// We're returning the vertices of each of our diamond shapes.
+/// We also return the edges. First the two looking like this: /.
+/// Then the two looking like this: \.
+/// The edges always start with the smallest x value.
+fn vertices_and_edges(sensors: &[Sensor]) -> (Vec<Pos>, Vec<Edge>) {
+    let mut vertices = Vec::with_capacity(sensors.len() * 4);
+    let mut edges = Vec::with_capacity(sensors.len() * 4);
+    for sensor in sensors {
+        let p = sensor.pos;
+        let left = (p.0 - sensor.dist, p.1);
+        let right = (p.0 + sensor.dist, p.1);
+        let top = (p.0, p.1 - sensor.dist);
+        let bottom = (p.0, p.1 + sensor.dist);
+        vertices.push(left);
+        vertices.push(right);
+        vertices.push(top);
+        vertices.push(bottom);
+        edges.push((left, top));
+        edges.push((bottom, right));
+        edges.push((top, right));
+        edges.push((left, bottom));
+    }
+    (vertices, edges)
+}
+
+fn edges(sensors: &[Sensor]) -> Vec<Edge> {
+    let mut edges = Vec::with_capacity(sensors.len() * 4);
+    for sensor in sensors {
+        let p = sensor.pos;
+        let left = (p.0 - sensor.dist, p.1);
+        let right = (p.0 + sensor.dist, p.1);
+        let top = (p.0, p.1 - sensor.dist);
+        let bottom = (p.0, p.1 + sensor.dist);
+        edges.push((left, top));
+        edges.push((bottom, right));
+        edges.push((top, right));
+        edges.push((left, bottom));
+    }
+    edges
+}
+
+/// We find the points of interest between 2 edges.
+/// That is when they intersect.
+fn points_of_interest(edges: &[Edge], index1: usize, index2: usize) -> [Option<i64>; 2] {
+    if index1 == index2 {
+        return [None; 2];
+    }
+    // we've been adding edges two by two having the same direction
+    let edge1 = edges[index1];
+    let edge2 = edges[index2];
+    let params1 = line_params(edge1.0, edge1.1);
+    let params2 = line_params(edge2.0, edge2.1);
+    if params1.0 == params2.0 {
+        // parallels
+        return [None; 2];
+    }
+    // if ((index1 % 4) / 2) == ((index2 % 4) / 2) {
+    //     // both edges have the same direction
+    //     return [None, None];
+    // }
+
+    let [y1, y2] = y_intersection(line_params(edge1.0, edge1.1), line_params(edge2.0, edge2.1));
+    [
+        y1.and_then(|y| (edge_contains_y(edge1, y) && edge_contains_y(edge2, y)).then_some(y)),
+        y2.and_then(|y| (edge_contains_y(edge1, y) && edge_contains_y(edge2, y)).then_some(y)),
+    ]
+}
+
+fn edge_contains_y(((_, y1), (_, y2)): Edge, y: i64) -> bool {
+    y >= y1.min(y2) && y <= y1.max(y2)
+}
+
+fn line_params(p1: Pos, p2: Pos) -> (i64, i64) {
+    //A line has this formula y = ax + b
+    //in our case the slope is always 1 or -1 so ints are ok
+    let a = (p2.1 - p1.1) / (p2.0 - p1.0);
+    debug_assert!(a == 1 || a == -1);
+    let b = p1.1 - a * p1.0;
+    (a, b)
+}
+
+fn y_intersection((a1, b1): (i64, i64), (a2, b2): (i64, i64)) -> [Option<i64>; 2] {
+    let top = a1 * b2 - a2 * b1;
+    let bottom = a1 - a2;
+    // discrete maths, don't we love it
+    if top % bottom == 0 {
+        [Some(top / bottom), None]
+    } else {
+        let result = top / bottom;
+        // is this correct?
+        [Some(result), Some(result + 1)]
+    }
+}
+
+pub fn better_part2(input: &str, max_pos: Pos) -> u64 {
     let sensors = parse(input);
-    for y in 0..=max_pos.1 {
-        let mut ranges = sensor_ranges_at_line(&sensors, y)
-            .iter()
-            .filter_map(|r| {
-                if r.end < 0 {
-                    None
-                } else if r.start > max_pos.0 {
-                    None
-                } else {
-                    Some(Range::new(r.start.max(0), r.end.min(max_pos.0)))
-                }
-            })
-            .collect::<Vec<_>>();
+    let edges = edges(&sensors);
+    let mut interesting_ys = BTreeSet::new();
+    for i in 0..edges.len() {
+        for j in 0..edges.len() {
+            points_of_interest(&edges, i, j)
+                .into_iter()
+                .filter_map(identity)
+                .for_each(|y| {
+                    if y >= 0 && y <= max_pos.1 {
+                        interesting_ys.insert(y);
+                    }
+                });
+        }
+    }
+    for y in interesting_ys.into_iter() {
+        let mut ranges = sensor_ranges_at_line(&sensors, y);
         ranges.sort_unstable_by_key(|r| r.start);
         let merged = merge_ranges(&ranges);
         if merged.len() > 1 {
@@ -162,7 +284,7 @@ pub fn part2(input: &str, max_pos: Pos) -> u64 {
             return 4000000 * x + y;
         }
     }
-    unreachable!();
+    unreachable!()
 }
 
 #[cfg(test)]
@@ -174,6 +296,48 @@ mod tests {
     #[test]
     fn test_parsing() {
         parse(TEST_INPUT);
+    }
+
+    #[test]
+    fn test_line_params() {
+        let a = line_params((2, 0), (4, 2));
+        assert_eq!(a, (1, -2));
+    }
+
+    #[test]
+    fn test_y_intersection() {
+        let a = y_intersection((-1, 2), (1, -2));
+        assert_eq!(a, [Some(0), None]);
+        let a = y_intersection(line_params((1, 1), (4, 4)), line_params((1, 3), (3, 1)));
+        assert_eq!(a, [Some(2), None]);
+        let a = y_intersection(line_params((0, 0), (3, 3)), line_params((0, 3), (3, 0)));
+        assert_eq!(a, [Some(1), Some(2)]);
+    }
+
+    #[test]
+    fn test_points_of_interest() {
+        let mut edges = vec![];
+        edges.push(((0, 2), (2, 0)));
+        edges.push(((2, 4), (4, 2)));
+        edges.push(((0, 2), (2, 4)));
+        edges.push(((2, 0), (4, 2)));
+        assert_eq!(points_of_interest(&edges, 0, 0), [None, None]);
+        assert_eq!(points_of_interest(&edges, 0, 1), [None, None]);
+        assert_eq!(points_of_interest(&edges, 0, 2), [Some(2), None]);
+        assert_eq!(points_of_interest(&edges, 0, 3), [Some(0), None]);
+        let mut all_points = BTreeSet::new();
+        for i in 0..edges.len() {
+            for j in 0..edges.len() {
+                points_of_interest(&edges, i, j)
+                    .into_iter()
+                    .filter_map(identity)
+                    .for_each(|y| {
+                        all_points.insert(y);
+                    });
+            }
+        }
+        println!("{:?}", all_points);
+        assert_eq!(all_points.len(), 3);
     }
 
     #[test]
@@ -208,18 +372,7 @@ mod tests {
         println!();
         println!("using merged ranges");
         for y in 0..20 {
-            let mut ranges = sensor_ranges_at_line(&sensors, y)
-                .iter()
-                .filter_map(|r| {
-                    if r.end < 0 {
-                        None
-                    } else if r.start > 20 {
-                        None
-                    } else {
-                        Some(Range::new(r.start.max(0), r.end.min(20)))
-                    }
-                })
-                .collect::<Vec<_>>();
+            let mut ranges = sensor_ranges_at_line(&sensors, y);
             ranges.sort_unstable_by_key(|r| r.start);
             let mut chars = [b' '; 21];
             let merged = merge_ranges(&ranges);
@@ -248,6 +401,12 @@ mod tests {
     #[test]
     fn test_part2() {
         assert_eq!(part2(TEST_INPUT, (20, 20)), 56000011);
-        assert_eq!(part2(INPUT, (4000000, 4000000)), 13743542639657);
+        //assert_eq!(part2(INPUT, (4000000, 4000000)), 13743542639657);
+    }
+    #[test]
+    fn test_better_part2() {
+        assert_eq!(better_part2(INPUT, (4000000, 4000000)), 13743542639657);
+        assert_eq!(better_part2(TEST_INPUT, (20, 20)), 56000011);
+        //assert_eq!(part2(INPUT, (4000000, 4000000)), 13743542639657);
     }
 }
