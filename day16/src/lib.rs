@@ -1,5 +1,6 @@
 pub const INPUT: &str = include_str!("input.txt");
 
+use cark_aoc_helper::*;
 use std::collections::{HashMap, VecDeque};
 
 type ValveId = usize;
@@ -7,7 +8,6 @@ type ValveId = usize;
 struct Valve {
     edges: Vec<ValveId>,
     rate: i32,
-    //    name: String,
 }
 
 struct Cave {
@@ -15,212 +15,81 @@ struct Cave {
     start_valve_id: ValveId,
 }
 
-
 pub fn part1(input: &str) -> i32 {
-    let cave = parse(input);
-    let destinations = std::iter::once(cave.start_valve_id)
-        .chain(
-            cave.valves
-                .iter()
-                .enumerate()
-                .filter_map(|(i, v)| if v.rate > 0 { Some(i) } else { None }),
-        )
-        .collect::<Vec<_>>();
-    let all_paths = Vec::with_capacity(1000);
-    for i in 0..destinations.len() - 1 {
-	for j in i+1..destinations.len() {
-	    let pair: usize = (1 << i) | (1 << j);
-	    
-	}
-    }
-
-    todo!()
-    // bfs(&cave.valves, cave.start_valve_id)
-    // let mut hit_miss: (u64, u64) = (0, 0);
-    // dfs(
-    //     &cave.valves,
-    //     State::new(cave.start_valve_id, 0, 0, 0),
-    //     &mut hit_miss,
-    // )
-    // let mut hit_miss = (0, 0);
-    // dfs(
-    //     &cave.valves,
-    //     State::new(cave.start_valve_id, 0, 0, 0),
-    //     &mut HashMap::new(),
-    //     &mut hit_miss,
-    // )
+    let cave = exec_printing_duration("parsing", || parse(input));
+    let max_ppm = cave.valves.iter().map(|v| v.rate).sum();
+    bfs(&cave.valves, cave.start_valve_id, max_ppm, 30)
 }
 
-// #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
-// struct State {
-//     valve: ValveId,
-//     time: i32,
-//     pressure: i32,
-//     ppm: i32,
-//     open_valves: u64,
-//     //    visited: Vec<ValveId>,
-// }
+fn bfs(valves: &[Valve], start_id: ValveId, max_ppm: i32, max_time: i32) -> i32 {
+    let mut queue = VecDeque::new();
+    queue.push_back(Agent::new(start_id));
+    let mut weights = Vec::with_capacity(valves.len());
+    weights.resize(valves.len(), i32::MIN);
+    let mut best_p = 0;
+    //let mut i = 0;
+    while let Some(mut agent) = queue.pop_front() {
+        //i += 1;
+        agent.inc_time();
+        if agent.p > best_p {
+            best_p = agent.p
+        }
+        if agent.t >= max_time {
+            continue;
+        }
+        if agent.ppm >= max_ppm {
+            queue.push_back(agent);
+            continue;
+        }
+        valves[agent.valve].edges.iter().for_each(|&id| {
+            let new_agent = Agent { valve: id, ..agent };
+            if weights[new_agent.valve] < new_agent.ppm {
+                weights[new_agent.valve] = new_agent.ppm;
+                queue.push_back(new_agent);
+            }
+        });
+        let (rate, mask) = (valves[agent.valve].rate, 1usize << agent.valve);
+        if rate > 0 && (agent.activated & mask) == 0 {
+            agent.ppm += rate;
+            agent.activated |= mask;
+            queue.push_back(agent);
+        }
+    }
+    //println!("{i}");
+    best_p
+}
 
-// impl State {
-//     fn new(valve: ValveId, time: i32, pressure: i32, ppm: i32) -> Self {
-//         State {
-//             valve,
-//             time,
-//             pressure,
-//             ppm,
-//             open_valves: 0,
-//             //            visited: vec![],
-//         }
-//     }
-//     fn weight(&self) -> i32 {
-//         self.pressure + (30 - self.time) * self.ppm
-//     }
-//     fn is_valve_open(&self) -> bool {
-//         ((self.open_valves >> self.valve) & 1) != 0
-//     }
-//     fn open_valve(&self, rate: i32) -> Self {
-//         let mut result = self.advance_time();
-//         result.open_valves |= 1 << self.valve;
-//         result.ppm += rate;
-//         result
-//     }
-//     fn advance_time(&self) -> Self {
-//         let mut result = self.clone();
-//         result.pressure += result.ppm;
-//         result.time += 1;
-//         result
-//     }
-//     fn go(&self, to: ValveId) -> Self {
-//         let mut result = self.advance_time();
-//         //        result.visited.push(to);
-//         result.valve = to;
-//         result
-//     }
-// }
+#[derive(Debug, Clone, Copy)]
+struct Agent {
+    valve: ValveId,
+    activated: usize,
+    ppm: i32,
+    p: i32,
+    t: i32,
+}
 
-// , memo: &mut HashMap<State, i32>
+impl Agent {
+    fn new(valve: ValveId) -> Self {
+        Self {
+            activated: 0,
+            p: 0,
+            ppm: 0,
+            t: 0,
+            valve,
+        }
+    }
 
-// fn dfs(valves: &[Valve], s: State, hit_miss: &mut (u64, u64)) -> i32 {
-//     hit_miss.0 += 1;
-//     if (hit_miss.0 + hit_miss.1) % 10000000 == 0 {
-//         println!("{hit_miss:?}");
-//     }
-//     if s.time == 30 {
-//         s.pressure
-//     } else {
-//         let valve = &valves[s.valve];
-//         std::iter::once(if !s.is_valve_open() && valve.rate > 0 {
-//             s.open_valve(valve.rate)
-//         } else {
-//             s.advance_time()
-//         })
-//         .chain(valve.edges.iter().map(|&id| s.go(id)))
-//         .map(|s| dfs(valves, s, hit_miss))
-//         .max()
-//         .unwrap()
-//     }
-// }
-
-// fn dfs(
-//     valves: &[Valve],
-//     s: State,
-//     memo: &mut HashMap<State, i32>,
-//     hit_miss: &mut (i32, i32),
-// ) -> i32 {
-//     if (hit_miss.0 + hit_miss.1) % 100000 == 0 {
-//         println!("{hit_miss:?}");
-//     }
-//     if let Some(result) = memo.get(&s) {
-//         hit_miss.0 += 1;
-//         *result
-//     } else {
-//         hit_miss.1 += 1;
-//         let result = if s.time == 30 {
-//             s.pressure
-//         } else {
-//             let valve = &valves[s.valve];
-//             std::iter::once(if !s.is_valve_open() && valve.rate > 0 {
-//                 s.open_valve(valve.rate)
-//             } else {
-//                 s.advance_time()
-//             })
-//             .chain(valve.edges.iter().map(|&id| s.go(id)))
-//             .map(|s| dfs(valves, s, memo, hit_miss))
-//             .max()
-//             .unwrap()
-//         };
-//         memo.insert(s, result);
-//         result
-//     }
-// }
-
-// fn bfs(valves: &[Valve], start: ValveId) -> i32 {
-//     let mut weights = Vec::with_capacity(valves.len());
-//     weights.resize(valves.len(), i32::MIN);
-//     let start = State::new(start, 0, 0, 0);
-//     let mut best_weight = 0;
-//     let mut queue = VecDeque::with_capacity(valves.len() * 2);
-//     queue.push_back(start);
-//     let mut iterations = 0;
-//     while let Some(state) = queue.pop_front() {
-//         iterations += 1;
-//         let valve = &valves[state.valve];
-//         let w = state.weight();
-//         if w > best_weight {
-//             best_weight = w;
-//         }
-//         if state.time == 30 {
-//             continue;
-//         }
-//         // std::iter::once(if !state.is_valve_open() && valve.rate > 0 {
-//         //     state.open_valve(valve.rate)
-//         // } else {
-//         //     state.advance_time()
-//         // })
-//         // .chain(valves[state.valve].edges.iter().map(|&next_id| State {
-//         //     valve: next_id,
-//         //     ..state.advance_time()
-//         // }))
-//         // .for_each(|state| {
-//         //     let w = state.weight();
-//         //     if w > weights[state.valve] {
-//         //         weights[state.valve] = w;
-//         //         queue.push_back(state)
-//         //     }
-//         // });
-//         valves[state.valve]
-//             .edges
-//             .iter()
-//             .map(|&next_id| State {
-//                 valve: next_id,
-//                 ..state.advance_time()
-//             })
-//             .chain(std::iter::once(
-//                 if !state.is_valve_open() && valve.rate > 0 {
-//                     state.open_valve(valve.rate)
-//                 } else {
-//                     state.advance_time()
-//                 },
-//             ))
-//             .for_each(|state| {
-//                 let w = state.weight();
-//                 if w > weights[state.valve] {
-//                     weights[state.valve] = w;
-//                     queue.push_back(state)
-//                 }
-//             });
-//     }
-//     println!("best weight: {best_weight}");
-//     println!("iterations: {iterations}");
-//     best_weight
-// }
+    fn inc_time(&mut self) {
+        self.t += 1;
+        self.p += self.ppm;
+    }
+}
 
 fn parse(input: &str) -> Cave {
     let mut start_valve_id = 0;
     let mut valves = vec![];
     let mut index_edges = HashMap::with_capacity(200);
     let mut name_indexes = HashMap::with_capacity(200);
-    //let mut max_pressure_per_min = 0;
     input
         .lines()
         .filter(|line| !line.is_empty())
@@ -233,11 +102,9 @@ fn parse(input: &str) -> Cave {
                 .and_then(|s| s.split('=').nth(1))
                 .map(|s| s.parse::<i32>().unwrap())
                 .unwrap();
-            //max_pressure_per_min += rate;
             let edges = parts
                 .next()
                 .and_then(|s| {
-                    //println!("{s}");
                     s.strip_prefix(" tunnels lead to valves ")
                         .or(s.strip_prefix(" tunnel leads to valve "))
                 })
@@ -249,11 +116,8 @@ fn parse(input: &str) -> Cave {
                 start_valve_id = valves.len()
             }
             valves.push(Valve {
-                // name: name.to_owned(),
                 edges: vec![],
-                //open: false,
                 rate,
-                //visits: 0,
             })
         });
     for (i, edges) in index_edges {
@@ -261,7 +125,6 @@ fn parse(input: &str) -> Cave {
     }
     Cave {
         start_valve_id,
-        //max_pressure_per_min,
         valves,
     }
 }
@@ -276,19 +139,18 @@ mod tests {
     fn test_parse() {
         let cave = parse(TEST_INPUT);
         assert_eq!(cave.valves.len(), 10);
-        assert_eq!(cave.valves.iter().flat_map(|v| &v.edges).count(), 20);
+        assert_eq!(cave.valves.iter().map(|v| v.edges.len()).sum::<usize>(), 20);
     }
 
-    // #[test]
-    // fn test_part1_test() {
-    //     assert_eq!(part1(TEST_INPUT), 1651);
-    // }
+    #[test]
+    fn test_part1_test() {
+        assert_eq!(part1(TEST_INPUT), 1651);
+    }
 
-    // #[test]
-    // fn test_part1_actual() {
-    //     println!("****ACTUAL DATA");
-    //     assert_eq!(part1(INPUT), 2181);
-    // }
+    #[test]
+    fn test_part1_actual() {
+        assert_eq!(part1(INPUT), 2181);
+    }
     //2181
     // #[test]
     // fn test_part2() {
