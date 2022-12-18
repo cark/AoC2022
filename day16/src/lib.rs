@@ -1,6 +1,5 @@
 pub const INPUT: &str = include_str!("input.txt");
 
-use cark_aoc_helper::*;
 use std::collections::{HashMap, VecDeque};
 
 type ValveId = usize;
@@ -16,43 +15,43 @@ struct Cave {
 }
 
 pub fn part1(input: &str) -> i32 {
-    let cave = exec_printing_duration("parsing", || parse(input));
+    let cave = parse(input);
     let max_ppm = cave.valves.iter().map(|v| v.rate).sum();
     bfs(&cave.valves, cave.start_valve_id, max_ppm, 30)
 }
 
 fn bfs(valves: &[Valve], start_id: ValveId, max_ppm: i32, max_time: i32) -> i32 {
     let mut queue = VecDeque::new();
-    queue.push_back(Agent::new(start_id));
+    queue.push_back(State::new(start_id));
     let mut weights = Vec::with_capacity(valves.len());
     weights.resize(valves.len(), i32::MIN);
     let mut best_p = 0;
     //let mut i = 0;
-    while let Some(mut agent) = queue.pop_front() {
+    while let Some(mut state) = queue.pop_front() {
         //i += 1;
-        agent.inc_time();
-        if agent.p > best_p {
-            best_p = agent.p
+        state.inc_time();
+        if state.p > best_p {
+            best_p = state.p
         }
-        if agent.t >= max_time {
+        if state.t >= max_time {
             continue;
         }
-        if agent.ppm >= max_ppm {
-            queue.push_back(agent);
+        if state.ppm >= max_ppm {
+            queue.push_back(state);
             continue;
         }
-        valves[agent.valve].edges.iter().for_each(|&id| {
-            let new_agent = Agent { valve: id, ..agent };
-            if weights[new_agent.valve] < new_agent.ppm {
-                weights[new_agent.valve] = new_agent.ppm;
-                queue.push_back(new_agent);
+        valves[state.valve].edges.iter().for_each(|&id| {
+            let new_state = State { valve: id, ..state };
+            if weights[new_state.valve] < new_state.ppm {
+                weights[new_state.valve] = new_state.ppm;
+                queue.push_back(new_state);
             }
         });
-        let (rate, mask) = (valves[agent.valve].rate, 1usize << agent.valve);
-        if rate > 0 && (agent.activated & mask) == 0 {
-            agent.ppm += rate;
-            agent.activated |= mask;
-            queue.push_back(agent);
+        let (rate, mask) = (valves[state.valve].rate, 1usize << state.valve);
+        if rate > 0 && (state.activated & mask) == 0 {
+            state.ppm += rate;
+            state.activated |= mask;
+            queue.push_back(state);
         }
     }
     //println!("{i}");
@@ -60,7 +59,7 @@ fn bfs(valves: &[Valve], start_id: ValveId, max_ppm: i32, max_time: i32) -> i32 
 }
 
 #[derive(Debug, Clone, Copy)]
-struct Agent {
+struct State {
     valve: ValveId,
     activated: usize,
     ppm: i32,
@@ -68,7 +67,7 @@ struct Agent {
     t: i32,
 }
 
-impl Agent {
+impl State {
     fn new(valve: ValveId) -> Self {
         Self {
             activated: 0,
@@ -87,9 +86,9 @@ impl Agent {
 
 fn parse(input: &str) -> Cave {
     let mut start_valve_id = 0;
-    let mut valves = vec![];
-    let mut index_edges = HashMap::with_capacity(200);
-    let mut name_indexes = HashMap::with_capacity(200);
+    let mut valves = Vec::with_capacity(200);
+    let mut index_edges = Vec::with_capacity(200);
+    let mut name_indexes = HashMap::new(); //HashMap::with_capacity(200);
     input
         .lines()
         .filter(|line| !line.is_empty())
@@ -110,8 +109,8 @@ fn parse(input: &str) -> Cave {
                 })
                 .map(|s| s.split(", ").collect::<Vec<_>>())
                 .unwrap();
-            index_edges.insert(valves.len(), edges);
-            name_indexes.insert(name.to_owned(), valves.len());
+            index_edges.push(edges);
+            name_indexes.insert(name, valves.len());
             if name == "AA" {
                 start_valve_id = valves.len()
             }
@@ -120,7 +119,7 @@ fn parse(input: &str) -> Cave {
                 rate,
             })
         });
-    for (i, edges) in index_edges {
+    for (i, edges) in index_edges.into_iter().enumerate() {
         valves[i].edges = edges.iter().map(|&name| name_indexes[name]).collect();
     }
     Cave {
