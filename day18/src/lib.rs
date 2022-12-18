@@ -51,8 +51,8 @@ struct Bounds {
 }
 
 impl Bounds {
-    fn new(positions: impl Iterator<Item = Pos>) -> Self {
-        let (min, max) = positions.fold(
+    fn new(positions: &[Pos]) -> Self {
+        let (min, max) = positions.iter().fold(
             (
                 (i32::MAX, i32::MAX, i32::MAX),
                 (i32::MIN, i32::MIN, i32::MIN),
@@ -84,13 +84,6 @@ impl Bounds {
         (pos.0 + pos.1 * self.lengths.0 + pos.2 * self.lengths.0 * self.lengths.1) as usize
     }
 
-    fn positions(&self) -> impl Iterator<Item = Pos> + '_ {
-        (0..self.lengths.0).flat_map(move |x| {
-            (0..self.lengths.1)
-                .flat_map(move |y| (0..self.lengths.2).map(move |z| add_pos((x, y, z), self.low)))
-        })
-    }
-
     fn in_bounds(&self, pos: Pos) -> bool {
         (self.low.0..self.low.0 + self.lengths.0).contains(&pos.0)
             && (self.low.1..self.low.1 + self.lengths.1).contains(&pos.1)
@@ -101,24 +94,29 @@ impl Bounds {
 struct Field {
     bounds: Bounds,
     data: Vec<bool>,
+    positions: Vec<Pos>,
 }
 
 impl Field {
     fn parse(input: &str) -> Self {
-        let positions = parse(input);
-        let bounds = Bounds::new(positions.clone()).grow();
-        let mut result = Self::new(bounds);
+        let positions = parse(input).collect::<Vec<_>>();
+        let bounds = Bounds::new(&positions).grow();
+        let mut result = Self::new(bounds, Vec::with_capacity(bounds.capacity()));
         for pos in positions {
             result.set(pos);
         }
         result
     }
 
-    fn new(bounds: Bounds) -> Self {
+    fn new(bounds: Bounds, positions: Vec<Pos>) -> Self {
         let len = bounds.capacity();
         let mut data = Vec::with_capacity(len);
         data.resize(len, false);
-        Self { bounds, data }
+        Self {
+            bounds,
+            data,
+            positions,
+        }
     }
 
     fn contains(&self, pos: Pos) -> bool {
@@ -127,22 +125,23 @@ impl Field {
 
     fn set(&mut self, pos: Pos) {
         self.data[self.bounds.index(pos)] = true;
-    }
-
-    fn cubes(&self) -> impl Iterator<Item = Pos> + '_ {
-        self.bounds
-            .positions()
-            .filter(|&pos| self.data[self.bounds.index(pos)])
+        self.positions.push(pos);
     }
 
     fn free_face_count(&self) -> i32 {
-        self.cubes()
-            .map(|pos| 6 - neighbors(&pos).filter(|&n| self.contains(n)).count() as i32)
+        self.positions
+            .iter()
+            .map(|&pos| neighbors(&pos).filter(|&n| !self.contains(n)).count() as i32)
             .sum()
     }
 
+    #[cfg(test)]
+    fn len(&self) -> usize {
+        self.positions.len()
+    }
+
     fn enclosing_space(&self) -> Self {
-        let mut result = Self::new(self.bounds);
+        let mut result = Self::new(self.bounds, Vec::with_capacity(self.bounds.capacity()));
         let mut queue = VecDeque::new();
         queue.push_back(self.bounds.low);
         while let Some(pos) = queue.pop_front() {
@@ -158,7 +157,8 @@ impl Field {
 
     fn exterior_face_count(&self) -> i32 {
         let enclosing = self.enclosing_space();
-        self.cubes()
+        self.positions
+            .iter()
             .map(|pos| neighbors(&pos).filter(|&n| enclosing.contains(n)).count() as i32)
             .sum()
     }
@@ -172,8 +172,8 @@ mod tests {
     const SHORT_INPUT: &str = "1,1,1 2,1,1";
     #[test]
     fn test_parsing() {
-        assert_eq!(Field::parse(SHORT_INPUT).cubes().count(), 2);
-        assert_eq!(Field::parse(TEST_INPUT).cubes().count(), 13);
+        assert_eq!(Field::parse(SHORT_INPUT).len(), 2);
+        assert_eq!(Field::parse(TEST_INPUT).len(), 13);
     }
 
     #[test]
@@ -186,6 +186,6 @@ mod tests {
     #[test]
     fn test_part2() {
         assert_eq!(part2(TEST_INPUT), 58);
-        //assert_eq!(part2(INPUT, (4000000, 4000000)), 13743542639657);
+        assert_eq!(part2(INPUT), 2444);
     }
 }
