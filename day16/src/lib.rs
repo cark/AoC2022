@@ -1,6 +1,10 @@
 pub const INPUT: &str = include_str!("input.txt");
 
-use std::collections::{HashMap, VecDeque};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, VecDeque},
+    rc::Rc,
+};
 
 type ValveId = usize;
 
@@ -17,50 +21,69 @@ struct Cave {
 pub fn part1(input: &str) -> i32 {
     let cave = parse(input);
     let max_ppm = cave.valves.iter().map(|v| v.rate).sum();
-    bfs(&cave.valves, cave.start_valve_id, max_ppm, 30)
+    bfs(&cave.valves, cave.start_valve_id, max_ppm, 30, 1)
 }
 
-fn bfs(valves: &[Valve], start_id: ValveId, max_ppm: i32, max_time: i32) -> i32 {
+fn bfs(
+    valves: &[Valve],
+    start_id: ValveId,
+    max_ppm: i32,
+    max_time: i32,
+    agent_count: usize,
+) -> i32 {
     let mut queue = VecDeque::new();
-    queue.push_back(State::new(start_id));
+    let state = Rc::new(RefCell::new(State::new()));
+    for i in 0..agent_count {
+        queue.push_back(Agent::new(start_id, state.clone()));
+    }
     let mut weights = Vec::with_capacity(valves.len());
     weights.resize(valves.len(), i32::MIN);
     let mut best_p = 0;
     //let mut i = 0;
-    while let Some(mut state) = queue.pop_front() {
+    while let Some(mut agent) = queue.pop_front() {
         //i += 1;
-        state.inc_time();
-        if state.p > best_p {
-            best_p = state.p
+        agent.inc_time();
+        if agent.p > best_p {
+            best_p = agent.p
         }
-        if state.t >= max_time {
+        if agent.t >= max_time {
             continue;
         }
-        if state.ppm >= max_ppm {
-            queue.push_back(state);
+        if agent.ppm >= max_ppm {
+            queue.push_back(agent);
             continue;
         }
-        valves[state.valve].edges.iter().for_each(|&id| {
-            let new_state = State { valve: id, ..state };
+        valves[agent.valve].edges.iter().for_each(|&id| {
+            let new_state = State { valve: id, ..agent };
             if weights[new_state.valve] < new_state.ppm {
                 weights[new_state.valve] = new_state.ppm;
                 queue.push_back(new_state);
             }
         });
-        let (rate, mask) = (valves[state.valve].rate, 1usize << state.valve);
-        if rate > 0 && (state.activated & mask) == 0 {
-            state.ppm += rate;
-            state.activated |= mask;
-            queue.push_back(state);
+        let (rate, mask) = (valves[agent.valve].rate, 1usize << agent.valve);
+        if rate > 0 && (agent.activated & mask) == 0 {
+            agent.ppm += rate;
+            agent.activated |= mask;
+            queue.push_back(agent);
         }
     }
     //println!("{i}");
     best_p
 }
 
+struct Agent {
+    valve: ValveId,
+    state: Rc<RefCell<State>>,
+}
+
+impl Agent {
+    fn new(valve: ValveId, state: Rc<RefCell<State>>) -> Self {
+        Self { valve, state }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct State {
-    valve: ValveId,
     activated: usize,
     ppm: i32,
     p: i32,
@@ -68,13 +91,12 @@ struct State {
 }
 
 impl State {
-    fn new(valve: ValveId) -> Self {
+    fn new() -> Self {
         Self {
             activated: 0,
             p: 0,
             ppm: 0,
             t: 0,
-            valve,
         }
     }
 
@@ -128,6 +150,20 @@ fn parse(input: &str) -> Cave {
     }
 }
 
+// fn pairs<T: Copy>(values: &[T]) -> Vec<Vec<T>> {
+//     let mut result = Vec::new();
+//     if values.len() == 1 {
+//         result.push(vec![values[0]]);
+//     } else if values.len() > 1 {
+//         for i in 0..values.len() - 1 {
+//             for j in i + 1..values.len() {
+//                 result.push(vec![values[i], values[j]]);
+//             }
+//         }
+//     }
+//     result
+// }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -150,6 +186,20 @@ mod tests {
     fn test_part1_actual() {
         assert_eq!(part1(INPUT), 2181);
     }
+
+    // #[test]
+    // fn test_pairs() {
+    //     let data: [usize; 0] = [];
+    //     let result: [[usize; 2]; 0] = [];
+    //     assert_eq!(pairs::<usize>(&data), result);
+    //     assert_eq!(pairs(&[1]), [[1]]);
+    //     assert_eq!(pairs(&[1, 2]), [[1, 2]]);
+    //     assert_eq!(pairs(&[1, 2, 3]), [[1, 2], [1, 3], [2, 3]]);
+    //     assert_eq!(
+    //         pairs(&[1, 2, 3, 4]),
+    //         [[1, 2], [1, 3], [1, 4], [2, 3], [2, 4], [3, 4]]
+    //     );
+    // }
     //2181
     // #[test]
     // fn test_part2() {
