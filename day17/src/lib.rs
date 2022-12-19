@@ -38,15 +38,23 @@ impl<'a> RockInstance<'a> {
     }
 }
 
+#[derive(Clone, Copy)]
+struct RowStat {
+    max_height: usize,
+    block_count: usize,
+}
+
 struct Field {
     rows: Vec<[bool; ACTUAL_WIDTH]>,
-    max_height: i32,
+    row_stats: Vec<Option<RowStat>>,
+    max_height: usize,
 }
 
 impl Field {
     fn new() -> Self {
         Self {
             rows: vec![],
+            row_stats: vec![],
             max_height: 1,
         }
     }
@@ -63,12 +71,13 @@ impl Field {
     fn ensure_row(&mut self, y: usize) {
         if self.rows.len() < y {
             self.rows.resize(y + 1, [false; ACTUAL_WIDTH]);
+            self.row_stats.resize(y + 1, None);
         }
     }
 
     fn place_rock<'a, 'b>(&'a mut self, rock: &'b Rock) -> RockInstance<'b> {
         //println!("palce size: {:?}", rock.size);
-        let offset = (3, self.max_height + 3);
+        let offset = (3, self.max_height as i32 + 3);
         self.ensure_row((offset.1 + rock.size.1) as usize);
         RockInstance::new(rock, offset)
     }
@@ -85,23 +94,27 @@ impl Field {
 
     fn paint(&mut self, ri: RockInstance) {
         let h = ri.offset.1 + ri.rock.size.1;
-        if h > self.max_height {
-            self.max_height = h;
+        if h > self.max_height as i32 {
+            self.max_height = h as usize;
         }
         //println!("max_height: {}", self.max_height);
         ri.pixels()
             .for_each(|p| self.rows[p.1 as usize][p.0 as usize] = true);
     }
 
-    fn print(&self, ri: &RockInstance) {
+    fn print(&self, ri: Option<&RockInstance>) {
         for (y, line) in self.rows.iter().enumerate().rev() {
             println!();
             line.iter().enumerate().for_each(|(x, &b)| {
                 let char = if b {
                     '#'
                 } else {
-                    if ri.pixels().find(|&p| p == (x as i32, y as i32)).is_some() {
-                        '@'
+                    if let Some(ri) = ri {
+                        if ri.pixels().find(|&p| p == (x as i32, y as i32)).is_some() {
+                            '@'
+                        } else {
+                            '.'
+                        }
                     } else {
                         '.'
                     }
@@ -151,7 +164,7 @@ impl Field {
     }
 }
 
-pub fn part1(input: &str) -> i32 {
+pub fn part1(input: &str) -> usize {
     let mut field = Field::new();
     let rocks = parse_rocks(ROCKS);
     let rocks = rocks.iter().cycle();
@@ -161,12 +174,65 @@ pub fn part1(input: &str) -> i32 {
     field.max_height - 1
 }
 
-pub fn part2(input: &str) -> i32 {
+pub fn part2(input: &str) -> usize {
     let mut field = Field::new();
     let rocks = parse_rocks(ROCKS);
     let rocks = rocks.iter().cycle();
     let (jet_count, jets) = parse_jets(input);
-    //field.simulate(rocks, jets, 2022);
+    field.simulate(rocks, jets, 10000);
+    //field.print(None);
+    let bytes = field
+        .rows
+        .iter()
+        .map(|row| {
+            let mut result: u8 = 0;
+            let mut mask: u8 = 1;
+            for i in 1..8 {
+                if row[i] {
+                    result |= mask;
+                }
+                mask <<= 1;
+            }
+            result
+        })
+        .collect::<Vec<_>>();
+    let search_string = &bytes[1000..1004];
+    let instances = bytes[1000..]
+        .windows(4)
+        .enumerate()
+        .filter_map(|(i, w)| (w == search_string).then_some(i))
+        .collect::<Vec<_>>();
+    instances
+        .windows(2)
+        .for_each(|w| println!("{}", w[1] - w[0]));
+    // .windows(2)
+    // .map(|w| (w[0].0, w[1].0, w[1].1 - w[0].1))
+    // .for_each(|i| println!("{i}"));
+    // println!("{:?}", bytes);
+    // let mut last_left_found = 0;
+    // let mut last_right_found = 0;
+    // let mut i = 0;
+    // while i < 100000 {
+    //     //search left
+    //     while !field.rows[i][1] {
+    //         i += 1;
+    //     }
+    //     println!(
+    //         "found left at {}, that's {} after last left.",
+    //         i,
+    //         i - last_left_found
+    //     );
+    //     last_left_found = i;
+    //     while !field.rows[i][7] {
+    //         i += 1;
+    //     }
+    //     println!(
+    //         "found right at {}, that's {} after last right.",
+    //         i,
+    //         i - last_right_found
+    //     );
+    //     last_right_found = i;
+    // }
     // field.simulate(rocks, jets, jet_count * 5 * 100);
     // for i in 0..90 {
     //     field.print_line(i * jet_count * 5);
@@ -217,11 +283,47 @@ fn parse_jets<'a>(input: &'a str) -> (usize, impl Iterator<Item = Pos> + 'a) {
     (jets.clone().count(), jets.cycle())
 }
 
+// fn brent(data: &[u8]) -> (usize, usize) {
+//     let cycle_len: usize;
+//     let mut hare = 0;
+//     let mut power: usize = 1;
+//     'outer: loop {
+//         let tortoise = hare;
+//         for i in 1..=power {
+//             hare = data[hare] as usize;
+//             if tortoise == hare {
+//                 cycle_len = i;
+//                 break 'outer;
+//             }
+//         }
+//         power *= 2;
+//     }
+//     hare = 0;
+//     for _ in 0..cycle_len {
+//         hare = data[hare] as usize;
+//     }
+//     let mut cycle_start = 0;
+//     let mut tortoise = 0;
+//     while tortoise != hare {
+//         tortoise = data[tortoise] as usize;
+//         hare = data[hare] as usize;
+//         cycle_start += 1;
+//     }
+//     (cycle_start, cycle_len)
+// }
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     const TEST_INPUT: &str = include_str!("test_input.txt");
+
+    // #[test]
+    // fn test_brent() {
+    //     println!("{:?}", brent(&[1, 9, 3, 4, 5, 1, 3]));
+    //     assert_eq!(brent(&[1, 2, 3, 1, 2, 3]), (1, 3));
+    //     assert_eq!(brent(&[1, 2, 1, 3, 1, 2, 1, 3]), (1, 2));
+    // }
 
     fn print_rocks() {
         let rocks = parse_rocks(ROCKS);
@@ -262,7 +364,7 @@ mod tests {
 
     #[test]
     fn test_part2() {
-        assert_eq!(part2(TEST_INPUT), 58);
+        // assert_eq!(part2(TEST_INPUT), 58);
         // assert_eq!(part2(INPUT), 2444);
     }
 }
