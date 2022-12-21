@@ -131,7 +131,6 @@ impl State {
 
 pub fn part1(input: &str) -> i64 {
     let mut state = State::parse(input);
-    let len = state.numbers.len();
     state
         .mix(1, 1)
         .iter()
