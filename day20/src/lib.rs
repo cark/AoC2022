@@ -46,12 +46,12 @@ impl State {
     }
 
     fn move_number(&mut self, num_index: NumberId, key: Number) {
-        let link = &self.links[num_index];
+        let len = self.links.len() as Number - 1;
+        let link = self.links[num_index];
         let number = link.number * key;
-        let moves = number % (self.links.len() as Number - 1);
-        let direction = moves.signum();
-        for _ in 0..moves.abs() {
-            self.step(num_index, direction);
+        let moves = ((number % len) + len) % len;
+        for _ in 0..moves {
+            self.step(num_index);
         }
     }
 
@@ -72,15 +72,10 @@ impl State {
         link.right = right;
     }
 
-    fn step(&mut self, index: NumberId, direction: Number) {
+    fn step(&mut self, index: NumberId) {
         let link = self.links[index];
-        if direction > 0 {
-            self.remove_link(index);
-            self.insert_link(index, link.right, self.links[link.right].right);
-        } else {
-            self.remove_link(index);
-            self.insert_link(index, self.links[link.left].left, link.left);
-        }
+        self.remove_link(index);
+        self.insert_link(index, link.right, self.links[link.right].right);
     }
 
     #[cfg(test)]
@@ -100,6 +95,10 @@ impl State {
 
     fn right_index(&self, index: LinkId) -> LinkId {
         self.links[index].right
+    }
+
+    fn left_index(&self, index: LinkId) -> LinkId {
+        self.links[index].left
     }
 
     fn index_of(&self, number: Number) -> LinkId {
@@ -170,13 +169,13 @@ mod tests {
     #[test]
     fn test_modulo() {
         assert_eq!(0i64 % 7, 0);
-        //assert_eq!(-4i64 % 4, -1);
+        // assert_eq!(-4i64 % 4, -1);
     }
 
     #[test]
     fn test_part1() {
         assert_eq!(part1(TEST_INPUT), 3);
-        // assert_eq!(part1(INPUT), 7713);
+        assert_eq!(part1(INPUT), 7713);
     }
 
     #[test]
