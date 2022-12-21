@@ -49,7 +49,7 @@ impl State {
         let len = self.links.len() as Number - 1;
         let link = self.links[num_index];
         let number = link.number * key;
-        let moves = ((number % len) + len) % len;
+        let moves = number.rem_euclid(len);
         let mut index = link.index;
         if moves == 0 {
             return;
