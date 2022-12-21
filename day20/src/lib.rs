@@ -1,6 +1,9 @@
-// 11801 is too high
+// we should go back to array based solution now that
+// we know the bug was about modulos
 
 pub const INPUT: &str = include_str!("input.txt");
+const KEY: i64 = 811589153;
+
 type Number = i64;
 type LinkId = usize;
 type NumberId = usize;
@@ -16,7 +19,6 @@ struct Link {
     right: LinkId,
     number: Number,
     index: LinkId,
-    //    start_at: LinkId,
 }
 
 impl State {
@@ -43,9 +45,9 @@ impl State {
         Self::new(numbers)
     }
 
-    fn move_number(&mut self, num_index: NumberId) {
+    fn move_number(&mut self, num_index: NumberId, key: Number) {
         let link = &self.links[num_index];
-        let number = link.number;
+        let number = link.number * key;
         let moves = number % (self.links.len() as Number - 1);
         let direction = moves.signum();
         for _ in 0..moves.abs() {
@@ -107,25 +109,43 @@ impl State {
         }
         index
     }
+
+    fn mix(&mut self, iterations: usize, key: Number) -> [LinkId; 3] {
+        for _ in 0..iterations {
+            for i in 0..self.numbers.len() {
+                self.move_number(i, key);
+            }
+        }
+        let mut result = [0; 3];
+        let zero_index = self.index_of(0);
+        let mut index = zero_index;
+        for i in 0..3 {
+            for _ in 0..1000 {
+                index = self.move_right(index);
+            }
+            result[i] = index;
+        }
+        result
+    }
 }
 
 pub fn part1(input: &str) -> i64 {
     let mut state = State::parse(input);
     let len = state.numbers.len();
-    for i in 0..len {
-        state.move_number(i);
-    }
-    let zero_index = state.index_of(0);
-    let mut sum = 0;
-    let mut index = zero_index;
-    for _ in 0..3 {
-        for _ in 0..1000 {
-            index = state.move_right(index);
-        }
-        let number = state.links[index].number;
-        sum += number;
-    }
-    sum
+    state
+        .mix(1, 1)
+        .iter()
+        .map(|&index| state.links[index].number)
+        .sum()
+}
+
+pub fn part2(input: &str) -> i64 {
+    let mut state = State::parse(input);
+    state
+        .mix(10, KEY)
+        .iter()
+        .map(|&index| state.links[index].number * KEY)
+        .sum()
 }
 
 fn pos_mod(val: i64, div: usize) -> usize {
@@ -157,21 +177,27 @@ mod tests {
     #[test]
     fn test_part1() {
         assert_eq!(part1(TEST_INPUT), 3);
-        assert_eq!(part1(INPUT), 7713);
+        // assert_eq!(part1(INPUT), 7713);
+    }
+
+    #[test]
+    fn test_part2() {
+        assert_eq!(part2(TEST_INPUT), 1623178306);
+        // assert_eq!(part2(INPUT), 1664569352803);
     }
 
     #[test]
     fn test_moves() {
         let mut state = State::new(vec![4, 5, 6, 1, 7, 8, 9]);
-        state.move_number(3);
+        state.move_number(3, 1);
         assert_eq!(state.moved_numbers(0), [4, 5, 6, 7, 1, 8, 9]);
         let mut state = State::new(vec![4, -2, 5, 6, 7, 8, 9]);
-        state.move_number(1);
+        state.move_number(1, 1);
         assert_eq!(state.moved_numbers(0), [4, 5, 6, 7, 8, -2, 9]);
         let mut state = State::parse(TEST_INPUT);
         std::iter::once(state.moved_numbers(0))
             .chain((0..7).map(move |i| {
-                state.move_number(i);
+                state.move_number(i, 1);
                 let result = state.moved_numbers(0);
                 //println!("{:?}", result);
                 result
