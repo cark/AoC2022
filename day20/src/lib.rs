@@ -50,9 +50,16 @@ impl State {
         let link = self.links[num_index];
         let number = link.number * key;
         let moves = ((number % len) + len) % len;
-        for _ in 0..moves {
-            self.step(num_index);
+        let mut index = link.index;
+        if moves == 0 {
+            return;
         }
+        //println!("{moves}");
+        for _ in 0..moves {
+            index = self.right_index(index);
+        }
+        self.remove_link(link.index);
+        self.insert_link(link.index, index, self.right_index(index));
     }
 
     fn remove_link(&mut self, index: NumberId) {
@@ -72,12 +79,6 @@ impl State {
         link.right = right;
     }
 
-    fn step(&mut self, index: NumberId) {
-        let link = self.links[index];
-        self.remove_link(index);
-        self.insert_link(index, link.right, self.links[link.right].right);
-    }
-
     #[cfg(test)]
     fn moved_numbers(&self, start_id: LinkId) -> Vec<Number> {
         let mut result = Vec::with_capacity(self.numbers.len());
@@ -95,10 +96,6 @@ impl State {
 
     fn right_index(&self, index: LinkId) -> LinkId {
         self.links[index].right
-    }
-
-    fn left_index(&self, index: LinkId) -> LinkId {
-        self.links[index].left
     }
 
     fn index_of(&self, number: Number) -> LinkId {
@@ -181,7 +178,7 @@ mod tests {
     #[test]
     fn test_part2() {
         assert_eq!(part2(TEST_INPUT), 1623178306);
-        // assert_eq!(part2(INPUT), 1664569352803);
+        assert_eq!(part2(INPUT), 1664569352803);
     }
 
     #[test]
