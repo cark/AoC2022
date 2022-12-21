@@ -1,0 +1,10 @@
+[package]
+name = "day21"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cark-aoc-helper = { git = "https://github.com/cark/cark-aoc-helper.git" }
+
+[dev-dependencies]
+criterion = "0.3"
