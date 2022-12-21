@@ -98,14 +98,14 @@ impl State {
         result
     }
 
-    fn move_right(&self, index: LinkId) -> LinkId {
+    fn right_index(&self, index: LinkId) -> LinkId {
         self.links[index].right
     }
 
     fn index_of(&self, number: Number) -> LinkId {
         let mut index = 0;
         while self.links[index].number != number {
-            index = self.move_right(index);
+            index = self.right_index(index);
         }
         index
     }
@@ -121,7 +121,7 @@ impl State {
         let mut index = zero_index;
         for i in 0..3 {
             for _ in 0..1000 {
-                index = self.move_right(index);
+                index = self.right_index(index);
             }
             result[i] = index;
         }
