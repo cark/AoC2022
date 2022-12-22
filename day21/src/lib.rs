@@ -42,6 +42,17 @@ impl MathOp {
             Div => Mul,
         }
     }
+
+    fn parse(input: &str) -> Self {
+        use MathOp::*;
+        match input {
+            "+" => Sum,
+            "-" => Sub,
+            "*" => Mul,
+            "/" => Div,
+            _ => unreachable!(),
+        }
+    }
 }
 
 enum EvalResult {
@@ -54,14 +65,13 @@ enum ResultPair {
     VarRight(MathOp, Number),
 }
 
-struct Troop<'a> {
+pub struct Troop<'a> {
     monkeys: Vec<Option<Monkey>>,
     name_to_id: HashMap<&'a str, MonkeyId>,
 }
 
 impl<'a> Troop<'a> {
-    fn parse(input: &'a str) -> Self {
-        use MathOp::*;
+    pub fn parse(input: &'a str) -> Self {
         use Monkey::*;
         input.lines().filter(|l| !l.is_empty()).fold(
             Self {
@@ -78,18 +88,9 @@ impl<'a> Troop<'a> {
                     Ok(number) => result.set_monkey(id, Literal(number)),
                     Err(_) => {
                         let first = result.name_id(first);
-                        let sign = tokens.next().unwrap();
+                        let op = tokens.next().unwrap();
                         let second = result.name_id(tokens.next().unwrap());
-                        result.set_monkey(
-                            id,
-                            match sign {
-                                "+" => Op(Sum, (first, second)),
-                                "-" => Op(Sub, (first, second)),
-                                "*" => Op(Mul, (first, second)),
-                                "/" => Op(Div, (first, second)),
-                                _ => unreachable!(),
-                            },
-                        );
+                        result.set_monkey(id, Op(MathOp::parse(op), (first, second)));
                     }
                 }
                 result
@@ -151,24 +152,21 @@ impl<'a> Troop<'a> {
     }
 }
 
-pub fn part1(input: &str) -> Number {
+pub fn part1(troop: &Troop) -> Number {
     use EvalResult::*;
-    let troop = Troop::parse(input);
     let root = troop.name_to_id["root"];
     let Literal(result) = troop.eval(root) else { unreachable!() };
     result
 }
 
-pub fn part2(input: &str) -> Number {
+pub fn part2(troop: &mut Troop) -> Number {
     use EvalResult::*;
-    let mut troop = Troop::parse(input);
     let root = troop.name_to_id["root"];
     let human = troop.name_to_id["humn"];
     let r = troop.monkeys[root].as_mut().unwrap();
     let Monkey::Op(_, pair) = *r else { unreachable!()} ;
     *r = Monkey::Eq(pair);
-    let r = troop.monkeys[human].as_mut().unwrap();
-    *r = Monkey::Variable;
+    troop.monkeys[human] = Some(Monkey::Variable);
     let Literal(result) = troop.eval(root) else { unreachable!() };
     result
 }
@@ -182,14 +180,14 @@ mod tests {
 
     #[test]
     fn test_part1() {
-        assert_eq!(part1(TEST_INPUT), 152);
-        assert_eq!(part1(INPUT), 87457751482938);
+        assert_eq!(part1(&Troop::parse(TEST_INPUT)), 152);
+        assert_eq!(part1(&Troop::parse(INPUT)), 87457751482938);
     }
 
     #[test]
     fn test_part2() {
-        assert_eq!(part2(TEST_INPUT2), 19);
-        assert_eq!(part2(TEST_INPUT), 301);
-        assert_eq!(part2(INPUT), 3221245824363);
+        assert_eq!(part2(&mut Troop::parse(TEST_INPUT2)), 19);
+        assert_eq!(part2(&mut Troop::parse(TEST_INPUT)), 301);
+        assert_eq!(part2(&mut Troop::parse(INPUT)), 3221245824363);
     }
 }
