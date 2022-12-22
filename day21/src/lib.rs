@@ -165,7 +165,7 @@ pub fn part2(input: &str) -> Number {
     let root = troop.name_to_id["root"];
     let human = troop.name_to_id["humn"];
     let r = troop.monkeys[root].as_mut().unwrap();
-    let Monkey::Op(_, pair) = *r else {panic!()};
+    let Monkey::Op(_, pair) = *r else { unreachable!()} ;
     *r = Monkey::Eq(pair);
     let r = troop.monkeys[human].as_mut().unwrap();
     *r = Monkey::Variable;
