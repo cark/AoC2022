@@ -17,25 +17,25 @@ fn to_dec(snafu: &str) -> i64 {
 }
 
 fn to_snafu(val: i64) -> String {
-    fn convert(val: i64, result: &mut Vec<u8>) {
+    fn convert(val: i64, mut result: String) -> String {
         let quot = val / 5;
         let rem = (val % 5) as u8;
-        let (v, carry) = match rem {
-            0 | 1 | 2 => (rem + b'0', 0),
-            3 => (b'=', 1),
-            4 => (b'-', 1),
+        let (c, carry) = match rem {
+            0 => ('0', 0),
+            1 => ('1', 0),
+            2 => ('2', 0),
+            3 => ('=', 1),
+            4 => ('-', 1),
             _ => panic!(),
         };
-        result.push(v);
         let quot = quot + carry;
         if quot > 0 {
-            convert(quot, result)
+            result = convert(quot, result);
         }
+        result.push(c);
+        result
     }
-    let mut r = Vec::with_capacity(20);
-    convert(val, &mut r);
-    r.reverse();
-    String::from_utf8(r).unwrap()
+    convert(val, String::with_capacity(20))
 }
 
 pub fn part1(input: &str) -> String {
