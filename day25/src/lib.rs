@@ -18,7 +18,7 @@ fn to_dec(snafu: &str) -> i64 {
 
 fn to_snafu(val: i64) -> String {
     let quot = val / 5;
-    let rem = (val % 5) as u8;
+    let rem = val % 5;
     let (c, carry) = match rem {
         0 => ('0', 0),
         1 => ('1', 0),
