@@ -1,4 +1,7 @@
-use std::collections::{HashMap, VecDeque};
+use std::{
+    collections::{HashMap, VecDeque},
+    iter::once,
+};
 
 pub const INPUT: &str = include_str!("input.txt");
 
@@ -65,6 +68,7 @@ impl Cave {
         for (i, edges) in index_edges.into_iter().enumerate() {
             valves[i].edges = edges.iter().map(|&name| name_indexes[name]).collect();
         }
+
         let mut result = Self {
             start_valve_id,
             good_valves: (0..valves.len())
@@ -75,14 +79,10 @@ impl Cave {
 
         // we're only interested in edges with pressure, and the distance to these
         // plus our starting valve
-        let interesting_valves = std::iter::once(start_valve_id)
-            .chain(result.good_valves.iter().copied())
-            .collect::<Vec<_>>();
-        for valve_id in interesting_valves {
+        for valve_id in once(start_valve_id).chain(result.good_valves.iter().copied()) {
             let distant_edges = result.find_distant_edges(valve_id);
             result.valves[valve_id].distant_edges = distant_edges;
         }
-        // result.valves_with_pressure = result.interesting_valves().count() as u32;
         result
     }
 
@@ -107,34 +107,38 @@ impl Cave {
         }
         result
     }
+}
 
-    fn best_pressure(valves: &[Valve], start_id: ValveId, acceptable: usize, time: i32) -> i32 {
-        fn dfs(valves: &[Valve], id: ValveId, acceptable: usize, time_left: i32, ppm: i32) -> i32 {
-            let acceptable = acceptable & !(1 << id);
-            let mut could_move = false;
-            let mut top_pressure = 0;
-            for de in valves[id].distant_edges.iter() {
+type BestPressureParams = (ValveId, usize, i32);
+
+fn best_pressure(
+    valves: &[Valve],
+    cache: &mut HashMap<BestPressureParams, i32>,
+    params @ (id, acceptable, time_left): (ValveId, usize, i32),
+) -> i32 {
+    if let Some(result) = cache.get(&params) {
+        *result
+    } else {
+        let valve = &valves[id];
+        let result = valve
+            .distant_edges
+            .iter()
+            .filter_map(|de| {
                 let mask = 1 << de.valve_id;
-                if acceptable & mask == 0 {
-                    continue;
-                }
                 let new_time_left = time_left - de.dist - 1;
-                if new_time_left < 0 {
-                    continue;
-                }
-                let new_ppm = ppm + valves[de.valve_id].rate;
-                let result_pressure = ppm * (de.dist + 1)
-                    + dfs(valves, de.valve_id, acceptable, new_time_left, new_ppm);
-                top_pressure = result_pressure.max(top_pressure);
-                could_move = true;
-            }
-            if could_move {
-                top_pressure
-            } else {
-                ppm * time_left
-            }
-        }
-        dfs(valves, start_id, acceptable, time, 0)
+                (acceptable & mask != 0 && new_time_left >= 0).then(|| {
+                    valve.rate * time_left
+                        + best_pressure(
+                            valves,
+                            cache,
+                            (de.valve_id, acceptable & !mask, new_time_left),
+                        )
+                })
+            })
+            .max()
+            .unwrap_or(valve.rate * time_left);
+        cache.insert(params, result);
+        result
     }
 }
 
@@ -144,17 +148,52 @@ pub fn part1(input: &str) -> i32 {
         .good_valves
         .iter()
         .fold(0usize, |result, i| result | (1 << i));
-    Cave::best_pressure(&cave.valves, cave.start_valve_id, acceptable, 30)
+    let mut cache = HashMap::new();
+    best_pressure(
+        &cave.valves,
+        &mut cache,
+        (cave.start_valve_id, acceptable, 30),
+    )
 }
 
 pub fn part2(input: &str) -> i32 {
-    // let cave = Cave::parse(input);
+    let cave = Cave::parse(input);
+    let combination_count = 2usize.pow(cave.good_valves.len() as u32);
+    let combination_mask = combination_count - 1;
+    let mut cache = HashMap::new();
+    (0..combination_count)
+        .map(|good_valves_mask| {
+            [good_valves_mask, (!good_valves_mask) & combination_mask]
+                .iter()
+                .map(|good_valves_mask| {
+                    cave.good_valves
+                        .iter()
+                        .enumerate()
+                        .fold(0usize, |result, (i, id)| {
+                            if good_valves_mask & (1 << i) != 0 {
+                                result | (1 << id)
+                            } else {
+                                result
+                            }
+                        })
+                })
+                .map(|acceptable| {
+                    best_pressure(
+                        &cave.valves,
+                        &mut cache,
+                        (cave.start_valve_id, acceptable, 26),
+                    )
+                })
+                .sum()
+        })
+        .max()
+        .unwrap()
     // println!("{}", cave.good_valves.len());
     // println!("{}", 2usize.pow(cave.good_valves.len() as u32));
     // let combinations = (0..2usize.pow(cave.good_valves.len()) - 1)
     //     .filter(|&id| cave.valves[id].rate > 0)
     //     .fold(0usize, |result, i| result | (1 << i));
-    todo!()
+    //    todo!();
 }
 
 //fn combinations
@@ -173,7 +212,8 @@ mod tests {
     // }
     #[test]
     fn test_part2() {
-        part2(INPUT);
+        assert_eq!(part2(TEST_INPUT), 1707);
+        assert_eq!(part2(INPUT), 2824);
     }
 
     #[test]
