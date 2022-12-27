@@ -14,6 +14,7 @@ struct Valve {
 #[derive(Debug)]
 struct Cave {
     valves: Vec<Valve>,
+    good_valves: Vec<ValveId>,
     start_valve_id: ValveId,
 }
 
@@ -66,13 +67,16 @@ impl Cave {
         }
         let mut result = Self {
             start_valve_id,
+            good_valves: (0..valves.len())
+                .filter(|&id| valves[id].rate > 0)
+                .collect(),
             valves,
         };
 
         // we're only interested in edges with pressure, and the distance to these
         // plus our starting valve
         let interesting_valves = std::iter::once(start_valve_id)
-            .chain((0..result.valves.len()).filter(|&id| result.valves[id].rate > 0))
+            .chain(result.good_valves.iter().copied())
             .collect::<Vec<_>>();
         for valve_id in interesting_valves {
             let distant_edges = result.find_distant_edges(valve_id);
@@ -82,7 +86,7 @@ impl Cave {
         result
     }
 
-    /// finds the valves with rate connected to the input starting valve, and their distance
+    /// finds the distances from start valve to valves with pressure rate
     fn find_distant_edges(&self, start_id: ValveId) -> Vec<DistantEdge> {
         let mut queue = VecDeque::new();
         let mut visited: usize = 0;
@@ -104,70 +108,98 @@ impl Cave {
         result
     }
 
-    fn best_pressure(valves: &[Valve], start_id: ValveId, time: i32) -> i32 {
-        fn dfs(
-            valves: &[Valve],
-            id: ValveId,
-            time_left: i32,
-            mut visited: usize,
-            ppm: i32,
-            pressure: i32,
-            mut pressures: Vec<i32>,
-        ) -> Vec<i32> {
-            visited |= 1 << id;
+    fn best_pressure(valves: &[Valve], start_id: ValveId, acceptable: usize, time: i32) -> i32 {
+        fn dfs(valves: &[Valve], id: ValveId, acceptable: usize, time_left: i32, ppm: i32) -> i32 {
+            let acceptable = acceptable & !(1 << id);
             let mut could_move = false;
+            let mut top_pressure = 0;
             for de in valves[id].distant_edges.iter() {
                 let mask = 1 << de.valve_id;
-                if visited & mask != 0 {
+                if acceptable & mask == 0 {
                     continue;
                 }
                 let new_time_left = time_left - de.dist - 1;
                 if new_time_left < 0 {
                     continue;
                 }
-                let new_pressure = pressure + ppm * (de.dist + 1);
                 let new_ppm = ppm + valves[de.valve_id].rate;
+                let result_pressure = ppm * (de.dist + 1)
+                    + dfs(valves, de.valve_id, acceptable, new_time_left, new_ppm);
+                top_pressure = result_pressure.max(top_pressure);
                 could_move = true;
-                pressures = dfs(
-                    valves,
-                    de.valve_id,
-                    new_time_left,
-                    visited,
-                    new_ppm,
-                    new_pressure,
-                    pressures,
-                );
             }
-            if !could_move {
-                let new_pressure = pressure + ppm * time_left;
-                pressures.push(new_pressure);
+            if could_move {
+                top_pressure
+            } else {
+                ppm * time_left
             }
-            pressures
         }
-        let pressures = dfs(
-            valves,
-            start_id,
-            time,
-            0 << start_id,
-            0,
-            0,
-            Vec::with_capacity(1024),
-        );
-        println!("{}", pressures.len());
-        println!("{}", !0usize);
-        *pressures.iter().max().unwrap()
+        dfs(valves, start_id, acceptable, time, 0)
     }
 }
 
 pub fn part1(input: &str) -> i32 {
     let cave = Cave::parse(input);
-    Cave::best_pressure(&cave.valves, cave.start_valve_id, 30)
+    let acceptable = cave
+        .good_valves
+        .iter()
+        .fold(0usize, |result, i| result | (1 << i));
+    Cave::best_pressure(&cave.valves, cave.start_valve_id, acceptable, 30)
 }
 
 pub fn part2(input: &str) -> i32 {
-    let cave = Cave::parse(input);
+    // let cave = Cave::parse(input);
+    // println!("{}", cave.good_valves.len());
+    // println!("{}", 2usize.pow(cave.good_valves.len() as u32));
+    // let combinations = (0..2usize.pow(cave.good_valves.len()) - 1)
+    //     .filter(|&id| cave.valves[id].rate > 0)
+    //     .fold(0usize, |result, i| result | (1 << i));
     todo!()
 }
+
+//fn combinations
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TEST_INPUT: &str = include_str!("test_input.txt");
+
+    // #[test]
+    // fn test_combinations() {
+    //     assert_eq!(combinations::<usize>(&[], 2), [[0usize; 0]; 0]);
+    //     assert_eq!(combinations(&[1usize], 2), [[0usize; 0]; 0]);
+    //     assert_eq!(combinations(&[1, 2], 2), [[1, 2]]);
+    // }
+    #[test]
+    fn test_part2() {
+        part2(INPUT);
+    }
+
+    #[test]
+    fn test_parse() {
+        let cave = Cave::parse(TEST_INPUT);
+        assert_eq!(cave.valves.len(), 10);
+        assert_eq!(cave.valves.iter().map(|v| v.edges.len()).sum::<usize>(), 20);
+        // println!("{:#?}", cave);
+        // assert!(false);
+    }
+
+    #[test]
+    fn test_part1() {
+        assert_eq!(part1(TEST_INPUT), 1651);
+        assert_eq!(part1(INPUT), 2181);
+        // assert!(false);
+    }
+}
+
+// 0,1,2
+// 0
+// 1
+// 2
+// 0 1
+// 0 2
+// 1 2
 
 // #[derive(Debug)]
 // struct Valve {
@@ -316,26 +348,3 @@ pub fn part2(input: &str) -> i32 {
 //     );
 //     best_p
 // }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const TEST_INPUT: &str = include_str!("test_input.txt");
-
-    #[test]
-    fn test_parse() {
-        let cave = Cave::parse(TEST_INPUT);
-        assert_eq!(cave.valves.len(), 10);
-        assert_eq!(cave.valves.iter().map(|v| v.edges.len()).sum::<usize>(), 20);
-        // println!("{:#?}", cave);
-        // assert!(false);
-    }
-
-    #[test]
-    fn test_part1() {
-        assert_eq!(part1(TEST_INPUT), 1651);
-        assert_eq!(part1(INPUT), 2181);
-        // assert!(false);
-    }
-}
