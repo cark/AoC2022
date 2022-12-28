@@ -1,5 +1,6 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    cmp::Ordering,
+    collections::{BinaryHeap, HashMap, VecDeque},
     iter::once,
 };
 
@@ -8,16 +9,14 @@ pub const INPUT: &str = include_str!("input.txt");
 type ValveId = usize;
 
 #[derive(Debug)]
-struct Valve {
-    edges: Vec<ValveId>,
-    distant_edges: Vec<DistantEdge>,
+struct Valve<Edge> {
+    edges: Vec<Edge>,
     rate: i32,
 }
 
 #[derive(Debug)]
-struct Cave {
-    valves: Vec<Valve>,
-    good_valves: Vec<ValveId>,
+pub struct Cave {
+    valves: Vec<Valve<DistantEdge>>,
     start_valve_id: ValveId,
 }
 
@@ -28,7 +27,7 @@ struct DistantEdge {
 }
 
 impl Cave {
-    fn parse(input: &str) -> Self {
+    pub fn parse(input: &str) -> Self {
         let mut start_valve_id = 0;
         let mut valves = Vec::with_capacity(200);
         let mut index_edges = Vec::with_capacity(200);
@@ -60,7 +59,6 @@ impl Cave {
                 }
                 valves.push(Valve {
                     edges: vec![],
-                    distant_edges: vec![],
                     rate,
                 })
             });
@@ -69,125 +67,192 @@ impl Cave {
             valves[i].edges = edges.iter().map(|&name| name_indexes[name]).collect();
         }
 
-        let mut result = Self {
-            start_valve_id,
-            good_valves: (0..valves.len())
-                .filter(|&id| valves[id].rate > 0)
-                .collect(),
-            valves,
-        };
-
-        // we're only interested in edges with pressure, and the distance to these
-        // plus our starting valve
-        for valve_id in once(start_valve_id).chain(result.good_valves.iter().copied()) {
-            let distant_edges = result.find_distant_edges(valve_id);
-            result.valves[valve_id].distant_edges = distant_edges;
-        }
-        result
-    }
-
-    /// finds the distances from start valve to valves with pressure rate
-    fn find_distant_edges(&self, start_id: ValveId) -> Vec<DistantEdge> {
-        let mut queue = VecDeque::new();
-        let mut visited: usize = 0;
-        let mut result = Vec::with_capacity(self.valves.len());
-        queue.push_back((0, start_id));
-        while let Some((dist, valve_id)) = queue.pop_front() {
-            let valve = &self.valves[valve_id];
-            if valve.rate > 0 && valve_id != start_id {
-                result.push(DistantEdge { dist, valve_id });
-            }
-            for &new_id in valve.edges.iter() {
-                let mask = 1 << new_id;
-                if visited & mask == 0 {
-                    visited |= mask;
-                    queue.push_back((dist + 1, new_id));
+        // we're only interested in "good" valves
+        let good_valve_ids = once(start_valve_id)
+            .chain((0..valves.len()).filter(|&id| valves[id].rate > 0))
+            .collect::<Vec<_>>();
+        let mut new_id = 0;
+        let old_to_new = (0..valves.len())
+            .map(|i| {
+                if valves[i].rate > 0 {
+                    new_id += 1;
+                    Some(new_id)
+                } else {
+                    None
                 }
+            })
+            .collect::<Vec<_>>();
+        let good_start = 0;
+        let good_valves = good_valve_ids
+            .iter()
+            .map(|&valve_id| {
+                let mut result = find_distant_edges(&valves, valve_id);
+                result
+                    .edges
+                    .iter_mut()
+                    .for_each(|de| de.valve_id = old_to_new[de.valve_id].unwrap());
+                result
+            })
+            .collect::<Vec<_>>();
+
+        Self {
+            start_valve_id: good_start,
+            valves: good_valves,
+        }
+    }
+}
+
+/// finds the distances from start valve to valves with pressure rate
+fn find_distant_edges(valves: &[Valve<ValveId>], start_id: ValveId) -> Valve<DistantEdge> {
+    let mut queue = VecDeque::new();
+    let mut visited: usize = 0;
+    let mut result = Vec::with_capacity(valves.len());
+    queue.push_back((0, start_id));
+    while let Some((dist, valve_id)) = queue.pop_front() {
+        let valve = &valves[valve_id];
+        if valve.rate > 0 && valve_id != start_id {
+            result.push(DistantEdge { dist, valve_id });
+        }
+        for &new_id in valve.edges.iter() {
+            let mask = 1 << new_id;
+            if visited & mask == 0 {
+                visited |= mask;
+                queue.push_back((dist + 1, new_id));
             }
         }
-        result
+    }
+    Valve {
+        rate: valves[start_id].rate,
+        edges: result,
     }
 }
 
-type BestPressureParams = (ValveId, usize, i32);
-
-fn best_pressure(
-    valves: &[Valve],
-    cache: &mut HashMap<BestPressureParams, i32>,
-    params @ (id, acceptable, time_left): (ValveId, usize, i32),
-) -> i32 {
-    if let Some(result) = cache.get(&params) {
-        *result
-    } else {
-        let valve = &valves[id];
-        let result = valve
-            .distant_edges
-            .iter()
-            .filter_map(|de| {
-                let mask = 1 << de.valve_id;
-                let new_time_left = time_left - de.dist - 1;
-                (acceptable & mask != 0 && new_time_left >= 0).then(|| {
-                    valve.rate * time_left
-                        + best_pressure(
-                            valves,
-                            cache,
-                            (de.valve_id, acceptable & !mask, new_time_left),
-                        )
-                })
-            })
-            .max()
-            .unwrap_or(valve.rate * time_left);
-        cache.insert(params, result);
-        result
-    }
-}
-
-pub fn part1(input: &str) -> i32 {
-    let cave = Cave::parse(input);
-    let acceptable = cave
-        .good_valves
-        .iter()
-        .fold(0usize, |result, i| result | (1 << i));
-    let mut cache = HashMap::new();
+pub fn part1(cave: &Cave) -> i32 {
+    let acceptable = (2u32.pow(cave.valves.len() as u32) - 1) & !1;
+    let mut tentative_pressures = vec![0; cave.valves.len()];
     best_pressure(
         &cave.valves,
-        &mut cache,
-        (cave.start_valve_id, acceptable, 30),
+        cave.start_valve_id,
+        acceptable,
+        30,
+        &mut tentative_pressures,
     )
 }
 
-pub fn part2(input: &str) -> i32 {
-    let cave = Cave::parse(input);
-    let combination_count = 2usize.pow(cave.good_valves.len() as u32);
-    let combination_mask = combination_count - 1;
+pub fn part2(cave: &Cave) -> i32 {
+    let combination_count = 2u32.pow(cave.valves.len() as u32);
+    let combination_mask = combination_count as u32 - 1;
+    let mut tentative_pressures = vec![0; cave.valves.len()];
     let mut cache = HashMap::new();
     (0..combination_count)
         .map(|good_valves_mask| {
-            [good_valves_mask, (!good_valves_mask) & combination_mask]
-                .iter()
-                .map(|good_valves_mask| {
-                    cave.good_valves
-                        .iter()
-                        .enumerate()
-                        .fold(0usize, |result, (i, id)| {
-                            if good_valves_mask & (1 << i) != 0 {
-                                result | (1 << id)
-                            } else {
-                                result
-                            }
-                        })
-                })
-                .map(|acceptable| {
-                    best_pressure(
+            // all combination of bits for good valves... and their converse for the elephant
+            [
+                good_valves_mask & !1,
+                (!good_valves_mask) & combination_mask & !1,
+            ]
+            .into_iter()
+            // get best pressure for this combination, both for elephant and me
+            .map(|acceptable| {
+                if let Some(&result) = cache.get(&(cave.start_valve_id, acceptable)) {
+                    result
+                } else {
+                    let result = best_pressure(
                         &cave.valves,
-                        &mut cache,
-                        (cave.start_valve_id, acceptable, 26),
-                    )
-                })
-                .sum()
+                        cave.start_valve_id,
+                        acceptable,
+                        26,
+                        &mut tentative_pressures,
+                    );
+                    cache.insert((cave.start_valve_id, acceptable), result);
+                    result
+                }
+            })
+            // sum those best pressures
+            .sum()
         })
         .max()
         .unwrap()
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Agent {
+    id: ValveId,
+    acceptable: u32,
+    ppm: i32,
+    p: i32,
+    time_left: i32,
+}
+
+fn best_pressure(
+    valves: &[Valve<DistantEdge>],
+    start: ValveId,
+    acceptable: u32,
+    time: i32,
+    tentative_pressures: &mut [i32],
+) -> i32 {
+    tentative_pressures.iter_mut().for_each(|p| *p = 0);
+    let mut queue = BinaryHeap::new();
+    queue.push(Agent {
+        id: start,
+        ppm: 0,
+        p: 0,
+        time_left: time,
+        acceptable,
+    });
+    while let Some(agent) = queue.pop() {
+        let valve = &valves[agent.id];
+        valve.edges.iter().for_each(|de| {
+            let mask = 1 << de.valve_id;
+            let new_time_left = agent.time_left - de.dist - 1;
+            if agent.acceptable & mask != 0 && new_time_left >= 0 {
+                let new_valve = &valves[de.valve_id];
+                let eventual_p =
+                    agent.p + agent.ppm * agent.time_left + new_valve.rate * new_time_left;
+                if eventual_p > tentative_pressures[de.valve_id] {
+                    tentative_pressures[de.valve_id] = eventual_p;
+                    queue.push(Agent {
+                        ppm: agent.ppm + new_valve.rate,
+                        p: agent.p + agent.ppm * (de.dist + 1),
+                        time_left: new_time_left,
+                        acceptable: agent.acceptable & !mask,
+                        id: de.valve_id,
+                    })
+                }
+            }
+        });
+    }
+    tentative_pressures.iter().copied().max().unwrap()
+}
+
+impl Ord for Agent {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let result = self.time_left.cmp(&other.time_left);
+        if let Ordering::Equal = result {
+            self.ppm.cmp(&other.ppm)
+        } else {
+            result
+        }
+    }
+}
+
+impl PartialOrd for Agent {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Agent {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+            && self.ppm == other.ppm
+            && self.p == other.p
+            && self.time_left == other.time_left
+    }
+}
+
+impl Eq for Agent {
+    fn assert_receiver_is_total_eq(&self) {}
 }
 
 #[cfg(test)]
@@ -197,21 +262,43 @@ mod tests {
     const TEST_INPUT: &str = include_str!("test_input.txt");
 
     #[test]
-    fn test_part2() {
-        assert_eq!(part2(TEST_INPUT), 1707);
-        assert_eq!(part2(INPUT), 2824);
+    fn test_silly() {
+        let mut queue = BinaryHeap::new();
+        queue.push(Agent {
+            id: 0,
+            ppm: 0,
+            p: 0,
+            time_left: 2,
+            acceptable: 0,
+        });
+        queue.push(Agent {
+            id: 0,
+            ppm: 2,
+            p: 0,
+            time_left: 3,
+            acceptable: 0,
+        });
+        queue.push(Agent {
+            id: 0,
+            ppm: 1,
+            p: 0,
+            time_left: 3,
+            acceptable: 0,
+        });
+        let Some(a) = queue.pop() else { panic!() };
+        assert_eq!(a.time_left, 3);
+        assert_eq!(a.ppm, 2);
     }
 
     #[test]
-    fn test_parse() {
-        let cave = Cave::parse(TEST_INPUT);
-        assert_eq!(cave.valves.len(), 10);
-        assert_eq!(cave.valves.iter().map(|v| v.edges.len()).sum::<usize>(), 20);
+    fn test_part2() {
+        assert_eq!(part2(&Cave::parse(TEST_INPUT)), 1707);
+        assert_eq!(part2(&Cave::parse(INPUT)), 2824);
     }
 
     #[test]
     fn test_part1() {
-        assert_eq!(part1(TEST_INPUT), 1651);
-        assert_eq!(part1(INPUT), 2181);
+        assert_eq!(part1(&Cave::parse(TEST_INPUT)), 1651);
+        assert_eq!(part1(&Cave::parse(INPUT)), 2181);
     }
 }
